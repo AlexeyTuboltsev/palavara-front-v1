@@ -8,7 +8,7 @@ import Browser.Dom exposing (Viewport,getViewport)
 import Browser.Events exposing (onResize)
 import Url exposing (Url)
 import Url.Builder exposing (absolute)
-import Url.Parser exposing (Parser, parse, int, string, map, oneOf, s, top,custom, (</>))
+import Url.Parser as UrlParser exposing (Parser, parse, int, string, oneOf, s, top,custom, (</>))
 import Task
 import Http exposing (get, expectJson)
 import Array exposing (Array)
@@ -146,7 +146,7 @@ main = Browser.application
 
 initProgress url key data =
     let
-        route = parseToRoute url
+        route = parseToRoute url data
         newUrl = routeToUrl route
     in
       (InitProgressModel {
@@ -166,7 +166,6 @@ init {apiBaseUrl, apiUrl, apiPort} url key =
     ,get {url = ("http://" ++ apiBaseUrl ++ ":" ++ apiPort ++ "/" ++ apiUrl), expect = expectJson SetData appDataDecoder}
     )
 
-
 view : Model -> Browser.Document Msg
 view model =
     case model of
@@ -179,32 +178,40 @@ view model =
         ReadyModel readyModelData ->
                     Browser.Document "ready" [text "ready"]
 
-sectionParser =
-    custom "SECTION" <| \segment ->
-        if(List.member segment sectionList) then
-            Just segment
-        else
-            Nothing
 
-tagParser =
-    custom "TAG" <| \segment ->
-        if(List.member segment tagList) then
-            Just segment
-        else
-            Nothing
+tagImageParserGenerator: AppData -> List (Parser (Route -> b) b)
+tagImageParserGenerator input =
+    List.concatMap (\{sectionId,groups} ->
+        List.map (\{tagId} -> UrlParser.map (\itemId -> TagImageRoute sectionId tagId itemId ) (s sectionId </> s tagId </> string)) groups
+    ) input
 
-routeParser : Parser (Route -> a) a
-routeParser = oneOf
-    [ map Root top
-    , map InfoRoute (s "info")
-    , map TagImageRoute (sectionParser </> tagParser </> string)
-    , map TagRoute (sectionParser </> tagParser )
-    , map SectionImageRoute (sectionParser </> string )
-    , map SectionRoute (sectionParser)
+tagParserGenerator: AppData ->  List (Parser (Route -> b) b)
+tagParserGenerator input =
+    List.concatMap (\{sectionId,groups} ->
+        List.map (\{tagId} -> UrlParser.map (TagRoute sectionId tagId ) (s sectionId </> s tagId)) groups
+    ) input
+
+sectionImageParserGenerator: AppData -> List (Parser (Route -> b) b)
+sectionImageParserGenerator input =
+        List.map (\{sectionId} -> UrlParser.map (\itemId -> SectionImageRoute sectionId itemId ) (s sectionId </> string)) input
+
+sectionParserGenerator: AppData -> List (Parser (Route -> b) b)
+sectionParserGenerator input =
+        List.map (\{sectionId} -> UrlParser.map (SectionRoute sectionId ) (s sectionId)) input
+
+
+routeParser : AppData -> Parser (Route -> a) a
+routeParser data = oneOf
+    [ UrlParser.map Root top
+    , UrlParser.map InfoRoute (s "info")
+    , oneOf (tagImageParserGenerator data)
+    , oneOf (tagParserGenerator data)
+    , oneOf (sectionImageParserGenerator data)
+    , oneOf (sectionParserGenerator data)
     ]
 
-parseToRoute url =
-    Maybe.withDefault Root (parse routeParser url)
+parseToRoute url data =
+    Maybe.withDefault Root (parse (routeParser data) url )
 
 routeToUrl route =
     case route of
@@ -236,13 +243,6 @@ routeToPage route =
             ContentPage
         TagImageRoute sectionId tagId imageId ->
             ContentPage
-
-
-
-
-
-
-
 
 
 appDataDecoder : JD.Decoder (List SectionData)
