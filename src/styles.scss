@@ -1,16 +1,79 @@
 @import '~purecss/build/pure.css';
 
+@font-face {
+  font-family: 'Brutal Type';
+  src: local("Brutal Type Bold"), local("BrutalType-Bold"), url("../public/fonts/BrutalType-Bold.woff2") format("woff2"), url("../public/fonts/BrutalType-Bold.woff") format("woff");
+  font-weight: bold;
+  font-style: normal; }
+@font-face {
+  font-family: 'Brutal Type';
+  src: local("Brutal Type Medium"), local("BrutalType-Medium"), url("../public/fonts/BrutalType-Medium.woff2") format("woff2"), url("../public/fonts/BrutalType-Medium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal; }
+@font-face {
+  font-family: 'Brutal Type';
+  src: local("Brutal Type Regular"), local("BrutalType-Regular"), url("../public/fonts/BrutalType.woff2") format("woff2"), url("../public/../public/fonts/BrutalType.woff") format("woff");
+  font-weight: normal;
+  font-style: normal; }
+* {
+  box-sizing: border-box; }
+
+a {
+  text-decoration: none; }
+a:visited, a:hover, a:focus {
+  text-decoration: none; }
+
+html,
 body {
-  background-color: #ddd;
-  margin-top: 20px;
-}
-.container {
-  max-width: 800px;
-  margin-left: auto;
-  margin-right: auto;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  background-color: #ffffff;
+  font-family: 'Brutal Type', sans-serif; }
+
+html {
+  height: 100%;
+  font-size: 62.5%; }
+
+body {
+  min-height: 100vh; }
+
+.loader {
+  display: flex;
+  flex-flow: column nowrap;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100vh;
 }
 
-
-button {
-  margin-right: 15px;
+.loader .logo-image {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 8.33rem;
+  height: 8.33rem;
+  background: #ffffff;
+  margin: 0 auto;
+  border: 1px solid #a5a5a5;
+  border-radius: calc(8.33rem / 2);
+  padding: 0.7rem;
+  cursor: pointer;
+  animation:spin 4s linear infinite;
 }
+
+.loader .logo-image svg {
+  height: 100%;
+  fill: #000045;
+}
+
+.loader .error {
+  font-size: 1.6rem;
+  color: #a5a5a5;
+  margin-top: 2rem;
+}
+
+@-moz-keyframes spin { 100% { -moz-transform: rotate(360deg); } }
+@-webkit-keyframes spin { 100% { -webkit-transform: rotate(360deg); } }
+@keyframes spin { 100% { -webkit-transform: rotate(360deg); transform:rotate(360deg); } }

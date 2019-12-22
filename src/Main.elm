@@ -1,7 +1,9 @@
 module Main exposing (main)
 
 import Constants exposing (sectionList, tagList)
-import Html exposing (text)
+import Html exposing (Html,text, div, a, span, br)
+import Html.Attributes exposing (class, href)
+import Html.Events.Extra exposing (onClickPreventDefault)
 import Browser
 import Browser.Navigation as Navigation
 import Browser.Dom exposing (Viewport,getViewport)
@@ -15,6 +17,7 @@ import Array exposing (Array)
 import Json.Decode as JD
 import Result exposing (Result)
 import Dict exposing (Dict)
+import Icons
 import Debug
 
 type alias Flags = {
@@ -61,8 +64,15 @@ type Route =
     | TagRoute SectionId TagId
     | TagImageRoute SectionId TagId ItemId
 
+type StartPageData = StartPageData
+type ListPageData = ListPageData
+type ContentPageData = ContentPageData
 
-type Page = StartPage | InfoPage | ListPage | ContentPage
+type Page =
+    StartPage StartPageData
+    | InfoPage
+    | ListPage ListPageData
+    | ContentPage ContentPageData
 
 type alias ReadyModelData = {
     viewport: Viewport
@@ -169,15 +179,118 @@ init {apiBaseUrl, apiUrl, apiPort} url key =
 view : Model -> Browser.Document Msg
 view model =
     case model of
-        InitModel data ->
-                    Browser.Document "starting" [text "starting"]
-        InitProgressModel initModelData ->
-            Browser.Document "init" [text "init"]
-        InitErrorModel errMessage ->
-            Browser.Document "init" [text "error"]
+        InitModel _ ->
+           Browser.Document "starting" initPage
+        InitProgressModel _ ->
+           Browser.Document "init" initPage
+        InitErrorModel _ ->
+           Browser.Document "init" [text "error"]
         ReadyModel readyModelData ->
-                    Browser.Document "ready" [text "ready"]
+           Browser.Document "ready" <| contentPage readyModelData
 
+
+initPage = [div [ class "loader" ]
+              [ div [ class "logo-image" ]
+                  [ Icons.logo ]
+              ]
+          ]
+
+contentPage: ReadyModelData -> List (Html Msg)
+contentPage {page} =
+    case page of
+        StartPage data ->
+            startPage data
+        InfoPage ->
+            []
+        ListPage data->
+            []
+        ContentPage data ->
+            []
+
+
+startPage {menuData} =
+    [div [ class "start" ]
+        [ div [ class "image-start" ] []
+        , buildFullMenu menuData
+        ]
+    ]
+
+type alias MenuData = {}
+type alias MenuSectionData = {}
+
+buildFullMenu : MenuData -> Html Msg
+buildFullMenu menuData =
+    div [ class "menu" ] (buildEntries menuData)
+
+buildEntries : MenuData -> List (Html Msg)
+buildEntries menuData =
+    buildLogo
+        --:: buildInfoEntry
+        :: List.map (\sectionData -> buildEntry sectionData) menuData
+
+
+buildLogo : Html Msg
+buildLogo =
+    div [ class "logo" ]
+        [ div [ class "logo-label" ]
+            [ text "Varvara Polyakova"
+            , span [ class "logo-label-byline" ]
+                [ br [] []
+                , text "illustration, graphics, ceramics "
+                ]
+            ]
+        , div [ class "logo-image", onClickPreventDefault <| SetRoute Root ]
+            [ Icons.logo
+            ]
+        ]
+
+buildInfoEntry : Html Msg
+buildInfoEntry =
+    div [ class "menu-entry info" ]
+        [ a [ class "menu-entry-label", href "info", onClickPreventDefault <| SetRoute InfoRoute ] [ text "info" ] ]
+
+buildEntry: MenuSectionData -> Html Msg
+buildEntry sectionData activeSectionId activeTagId=
+    let
+        activeSectionActiveGroupId =
+            if sectionData.sectionId == activeSectionId then
+                activeTagId
+            else
+                Nothing
+    in
+        div [ class "menu-entry" ]
+            [ div [ class ("menu-entry-label " ++ (if sectionData.sectionId == activeSectionId then "active" else "")) ] [ text <| sectionData.label ++ ":" ]
+            , div [ class "menu-entry-groups" ] (buildGroups section activeSectionActiveGroupId)
+            ]
+
+buildGroups : SectionData -> Maybe GroupId -> List (Html Msg)
+buildGroups section activeGroupId =
+    List.map (\group -> buildGroup section.sectionId group activeGroupId) section.groups
+        |> List.intersperse
+            (span [ class "pipe" ]
+                [ text "  "
+                , text "|"
+                , text "  "
+                ]
+            )
+
+buildGroup : String -> GroupData -> Maybe GroupId -> Html Msg
+buildGroup sectionId group activeGroupId =
+    a (setActive [ href group.groupId, onClickPreventDefault <| SetSectionRoute (Just sectionId) (Just group.groupId) Nothing ] group.groupId activeGroupId) [ text group.label ]
+
+setActive : List (Attribute Msg) -> GroupId -> Maybe GroupId -> List (Attribute Msg)
+setActive attr groupId activeGroupId =
+    case activeGroupId of
+        Nothing ->
+            attr
+
+        Just gId ->
+            if gId == groupId then
+                (class "active") :: attr
+            else
+                attr
+
+-- URL PARSING --
 
 tagImageParserGenerator: AppData -> List (Parser (Route -> b) b)
 tagImageParserGenerator input =
