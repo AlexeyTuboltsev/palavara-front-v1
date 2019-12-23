@@ -64,13 +64,32 @@ type Route =
     | TagRoute SectionId TagId
     | TagImageRoute SectionId TagId ItemId
 
-type StartPageData = StartPageData
-type ListPageData = ListPageData
-type ContentPageData = ContentPageData
+type alias MenuTagData = {
+    tagId: TagId
+    ,sectionId: SectionId
+    ,tagLabel: String
+    ,tagIsActive:Bool
+    ,onClickMessage: Msg
+    }
+
+type alias MenuSectionData = {
+    sectionId: SectionId
+    ,sectionLabel: String
+    ,sectionIsActive: Bool
+    ,tags: List MenuTagData
+    ,onClickMessage: Msg
+    }
+
+type alias MenuData = List MenuSectionData
+
+type StartPageData = StartPageData MenuData
+type ListPageData = ListPageData MenuData
+type ContentPageData = ContentPageData MenuData
+type InfoPageData = InfoPageData MenuData
 
 type Page =
     StartPage StartPageData
-    | InfoPage
+    | InfoPage InfoPageData
     | ListPage ListPageData
     | ContentPage ContentPageData
 
@@ -105,6 +124,7 @@ type Msg
   | SetData (Result Http.Error AppData)
   | LinkClicked Browser.UrlRequest
   | UrlChanged Url
+  | SetRoute Route
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -123,7 +143,7 @@ update message model =
         InitProgressModel {key,route, data} ->
             case message of
                 SetViewport viewport ->
-                    (ReadyModel {viewport = viewport, key = key, route = route, page = routeToPage route, data = data}, Cmd.none)
+                    (ReadyModel {viewport = viewport, key = key, route = route, page = routeToPage route data, data = data}, Cmd.none)
                 _ ->
                     (model, Cmd.none)
         InitErrorModel errData ->
@@ -136,6 +156,7 @@ update message model =
                     (ReadyModel readyModelData, Task.perform SetViewport getViewport)
                 SetViewport viewport ->
                     (ReadyModel {readyModelData | viewport = viewport}, Cmd.none)
+                --SetRoute    TODO
                 _ ->
                     (model, Cmd.none)
 
@@ -186,7 +207,7 @@ view model =
         InitErrorModel _ ->
            Browser.Document "init" [text "error"]
         ReadyModel readyModelData ->
-           Browser.Document "ready" <| contentPage readyModelData
+           Browser.Document "ready" <| contentPage readyModelData.page
 
 
 initPage = [div [ class "loader" ]
@@ -195,28 +216,28 @@ initPage = [div [ class "loader" ]
               ]
           ]
 
-contentPage: ReadyModelData -> List (Html Msg)
-contentPage {page} =
+contentPage: Page -> List (Html Msg)
+contentPage page =
     case page of
         StartPage data ->
-            startPage data
-        InfoPage ->
+           startPage data
+        InfoPage _ ->
             []
-        ListPage data->
+        ListPage _ ->
             []
-        ContentPage data ->
+        ContentPage _ ->
             []
 
 
-startPage {menuData} =
-    [div [ class "start" ]
-        [ div [ class "image-start" ] []
-        , buildFullMenu menuData
-        ]
-    ]
+startPage data =
+    case data of
+        StartPageData menuData ->
+            [div [ class "start" ]
+                [ div [ class "image-start" ] []
+                , buildFullMenu menuData
+                ]
+            ]
 
-type alias MenuData = {}
-type alias MenuSectionData = {}
 
 buildFullMenu : MenuData -> Html Msg
 buildFullMenu menuData =
@@ -244,28 +265,21 @@ buildLogo =
             ]
         ]
 
-buildInfoEntry : Html Msg
-buildInfoEntry =
-    div [ class "menu-entry info" ]
-        [ a [ class "menu-entry-label", href "info", onClickPreventDefault <| SetRoute InfoRoute ] [ text "info" ] ]
+--buildInfoEntry : Html Msg
+--buildInfoEntry =
+--    div [ class "menu-entry info" ]
+--        [ a [ class "menu-entry-label", href "info", onClickPreventDefault <| SetRoute InfoRoute ] [ text "info" ] ]
 
 buildEntry: MenuSectionData -> Html Msg
-buildEntry sectionData activeSectionId activeTagId=
-    let
-        activeSectionActiveGroupId =
-            if sectionData.sectionId == activeSectionId then
-                activeTagId
-            else
-                Nothing
-    in
-        div [ class "menu-entry" ]
-            [ div [ class ("menu-entry-label " ++ (if sectionData.sectionId == activeSectionId then "active" else "")) ] [ text <| sectionData.label ++ ":" ]
-            , div [ class "menu-entry-groups" ] (buildGroups section activeSectionActiveGroupId)
-            ]
+buildEntry sectionData =
+    div [ class "menu-entry", onClickPreventDefault sectionData.onClickMessage ]
+        [ div [ class ("menu-entry-label " ++ (if sectionData.sectionIsActive == True then "active" else "")) ] [ text <| sectionData.sectionLabel ++ ":" ]
+        , div [ class "menu-entry-groups" ] (buildGroups sectionData.tags)
+        ]
 
-buildGroups : SectionData -> Maybe GroupId -> List (Html Msg)
-buildGroups section activeGroupId =
-    List.map (\group -> buildGroup section.sectionId group activeGroupId) section.groups
+buildGroups : List MenuTagData -> List (Html Msg)
+buildGroups tagDataList =
+    List.map (\tagData -> buildGroup tagData) tagDataList
         |> List.intersperse
             (span [ class "pipe" ]
                 [ text "  "
@@ -274,21 +288,14 @@ buildGroups section activeGroupId =
                 ]
             )
 
-buildGroup : String -> GroupData -> Maybe GroupId -> Html Msg
-buildGroup sectionId group activeGroupId =
-    a (setActive [ href group.groupId, onClickPreventDefault <| SetSectionRoute (Just sectionId) (Just group.groupId) Nothing ] group.groupId activeGroupId) [ text group.label ]
+buildGroup : MenuTagData -> Html Msg
+buildGroup tagData =
+    a [
+    class (if tagData.tagIsActive == True then "active" else "")
+    ,href tagData.tagId
+    ,onClickPreventDefault tagData.onClickMessage
+    ] [ text tagData.tagLabel ]
 
-setActive : List (Attribute Msg) -> GroupId -> Maybe GroupId -> List (Attribute Msg)
-setActive attr groupId activeGroupId =
-    case activeGroupId of
-        Nothing ->
-            attr
-
-        Just gId ->
-            if gId == groupId then
-                (class "active") :: attr
-            else
-                attr
 
 -- URL PARSING --
 
@@ -341,22 +348,56 @@ routeToUrl route =
         TagImageRoute sectionId tagId imageId ->
             absolute [sectionId,tagId, imageId] []
 
-routeToPage: Route -> Page
-routeToPage route =
+routeToPage: Route -> AppData -> Page
+routeToPage route appData =
     case route of
         Root ->
-            StartPage
+            let menuData =  List.map
+                    (\{sectionId,label,groups} ->
+                        MenuSectionData sectionId label False [] NoOp
+                    ) appData
+            in
+            StartPage <| StartPageData menuData
         InfoRoute ->
-            InfoPage
-        SectionRoute sectionId ->
-            ListPage
-        TagRoute sectionId tagId ->
-            ListPage
-        SectionImageRoute sectionId imageId ->
-            ContentPage
-        TagImageRoute sectionId tagId imageId ->
-            ContentPage
+            let menuData =  List.map
+                    (\{sectionId,label,groups} ->
+                        MenuSectionData sectionId label True [] NoOp
+                    ) appData
+            in
+            InfoPage <| InfoPageData menuData
+        SectionRoute activeSectionId ->
+             let menuData =  List.map
+                    (\{sectionId,label,groups} ->
+                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) [] NoOp
+                    ) appData
+             in
+             ListPage <| ListPageData menuData
+        TagRoute activeSectionId activeTagId ->
+            let menuData =  List.map
+                    (\{sectionId,label,groups} ->
+                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) [] NoOp
+                    ) appData
+            in
+            ListPage <| ListPageData menuData
+        SectionImageRoute activeSectionId imageId ->
+            let menuData =  List.map
+                    (\{sectionId,label,groups} ->
+                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) [] NoOp
+                    ) appData
+            in
+            ContentPage <| ContentPageData menuData
+        TagImageRoute activeSectionId activeTagId imageId ->
+            let menuData =  List.map
+                    (\{sectionId,label,groups} ->
+                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) [] NoOp
+                    ) appData
+            in
+            ContentPage <| ContentPageData menuData
 
+isSectionActive sectionId activeSectionId =
+    sectionId == activeSectionId
+
+-- JSON --
 
 appDataDecoder : JD.Decoder (List SectionData)
 appDataDecoder =

@@ -1,15 +1,36 @@
 {
-  "short_name": "Elm App",
-  "name": "Create Elm App Sample",
+  "short_name": "palavara",
+  "name": "PALAVARA",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "favicon/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon/favicon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon/favicon-160x160.png",
+      "sizes": "160x160",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon/favicon-192x192.png",
       "sizes": "192x192",
       "type": "image/png"
     }
   ],
-  "start_url": "./index.html",
-  "display": "standalone",
+  "display": "minimal-ui",
   "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "background_color": "#ffffff",
+  "lang": "en-US",
+  "orientation": "portrait-primary"
 }
