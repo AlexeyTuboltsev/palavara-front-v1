@@ -52,8 +52,6 @@ type alias SectionData =
     , groups : List GroupData
     }
 
---type alias ItemDataWithId = {itemId:ItemId, ItemData}
-
 type alias AppData = List SectionData
 
 type Route =
@@ -66,7 +64,6 @@ type Route =
 
 type alias MenuTagData = {
     tagId: TagId
-    ,sectionId: SectionId
     ,tagLabel: String
     ,tagIsActive:Bool
     ,onClickMessage: Msg
@@ -127,6 +124,8 @@ type Msg
   | SetRoute Route
 
 
+-- UPDATE --
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case model of
@@ -161,10 +160,7 @@ update message model =
                     (model, Cmd.none)
 
 
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-  onResize (\_ _ -> GetViewport)
-
+-- MAIN --
 
 main = Browser.application
    { init = init
@@ -197,6 +193,12 @@ init {apiBaseUrl, apiUrl, apiPort} url key =
     ,get {url = ("http://" ++ apiBaseUrl ++ ":" ++ apiPort ++ "/" ++ apiUrl), expect = expectJson SetData appDataDecoder}
     )
 
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+  onResize (\_ _ -> GetViewport)
+
+-- VIEW --
+
 view : Model -> Browser.Document Msg
 view model =
     case model of
@@ -207,7 +209,7 @@ view model =
         InitErrorModel _ ->
            Browser.Document "init" [text "error"]
         ReadyModel readyModelData ->
-           Browser.Document "ready" <| contentPage readyModelData.page
+           Browser.Document "*-PALAVARA-*" <| contentPage readyModelData.page
 
 
 initPage = [div [ class "loader" ]
@@ -297,41 +299,7 @@ buildGroup tagData =
     ] [ text tagData.tagLabel ]
 
 
--- URL PARSING --
-
-tagImageParserGenerator: AppData -> List (Parser (Route -> b) b)
-tagImageParserGenerator input =
-    List.concatMap (\{sectionId,groups} ->
-        List.map (\{tagId} -> UrlParser.map (\itemId -> TagImageRoute sectionId tagId itemId ) (s sectionId </> s tagId </> string)) groups
-    ) input
-
-tagParserGenerator: AppData ->  List (Parser (Route -> b) b)
-tagParserGenerator input =
-    List.concatMap (\{sectionId,groups} ->
-        List.map (\{tagId} -> UrlParser.map (TagRoute sectionId tagId ) (s sectionId </> s tagId)) groups
-    ) input
-
-sectionImageParserGenerator: AppData -> List (Parser (Route -> b) b)
-sectionImageParserGenerator input =
-        List.map (\{sectionId} -> UrlParser.map (\itemId -> SectionImageRoute sectionId itemId ) (s sectionId </> string)) input
-
-sectionParserGenerator: AppData -> List (Parser (Route -> b) b)
-sectionParserGenerator input =
-        List.map (\{sectionId} -> UrlParser.map (SectionRoute sectionId ) (s sectionId)) input
-
-
-routeParser : AppData -> Parser (Route -> a) a
-routeParser data = oneOf
-    [ UrlParser.map Root top
-    , UrlParser.map InfoRoute (s "info")
-    , oneOf (tagImageParserGenerator data)
-    , oneOf (tagParserGenerator data)
-    , oneOf (sectionImageParserGenerator data)
-    , oneOf (sectionParserGenerator data)
-    ]
-
-parseToRoute url data =
-    Maybe.withDefault Root (parse (routeParser data) url )
+-- ROUTING
 
 routeToUrl route =
     case route of
@@ -348,54 +316,94 @@ routeToUrl route =
         TagImageRoute sectionId tagId imageId ->
             absolute [sectionId,tagId, imageId] []
 
+
 routeToPage: Route -> AppData -> Page
 routeToPage route appData =
     case route of
         Root ->
-            let menuData =  List.map
+            let
+                menuTagData groups =
+                     List.map
+                     (\{tagId, label } ->
+                         MenuTagData tagId label False NoOp
+                     )  groups
+                menuData =  List.map
                     (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label False [] NoOp
+                        MenuSectionData sectionId label False (menuTagData groups) NoOp
                     ) appData
             in
             StartPage <| StartPageData menuData
         InfoRoute ->
-            let menuData =  List.map
+            let
+                menuTagData groups =
+                     List.map
+                     (\{tagId, label } ->
+                         MenuTagData tagId label False NoOp
+                     )  groups
+                menuData =  List.map
                     (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label True [] NoOp
+                        MenuSectionData sectionId label True (menuTagData groups) NoOp
                     ) appData
             in
             InfoPage <| InfoPageData menuData
         SectionRoute activeSectionId ->
-             let menuData =  List.map
+             let
+                 menuTagData groups =
+                     List.map
+                     (\{tagId, label } ->
+                         MenuTagData tagId label False NoOp
+                     )  groups
+                 menuData =  List.map
                     (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) [] NoOp
+                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData groups) NoOp
                     ) appData
              in
              ListPage <| ListPageData menuData
         TagRoute activeSectionId activeTagId ->
-            let menuData =  List.map
+            let
+                menuTagData groups =
+                     List.map
+                     (\{tagId, label } ->
+                         MenuTagData tagId label (isTagActive tagId activeTagId) NoOp
+                     )  groups
+                menuData =  List.map
                     (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) [] NoOp
+                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData groups) NoOp
                     ) appData
             in
             ListPage <| ListPageData menuData
         SectionImageRoute activeSectionId imageId ->
-            let menuData =  List.map
+            let
+                menuTagData groups =
+                     List.map
+                     (\{tagId, label } ->
+                         MenuTagData tagId label False NoOp
+                     )  groups
+                menuData =  List.map
                     (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) [] NoOp
+                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData groups) NoOp
                     ) appData
             in
             ContentPage <| ContentPageData menuData
         TagImageRoute activeSectionId activeTagId imageId ->
-            let menuData =  List.map
+            let
+                 menuTagData groups =
+                     List.map
+                     (\{tagId, label } ->
+                         MenuTagData tagId label (isTagActive tagId activeTagId) NoOp
+                     )  groups
+                 menuData =  List.map
                     (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) [] NoOp
+                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData groups) NoOp
                     ) appData
             in
             ContentPage <| ContentPageData menuData
 
 isSectionActive sectionId activeSectionId =
     sectionId == activeSectionId
+
+isTagActive tagId activeTagId =
+    tagId == activeTagId
 
 -- JSON --
 
@@ -437,3 +445,39 @@ sectionDataDecoder =
         (JD.field "items" itemsDecoder)
         (JD.field "items" itemOrderDecoder)
         (JD.field "groups" (JD.list groupDataDecoder))
+
+-- URL PARSING --
+
+tagImageParserGenerator: AppData -> List (Parser (Route -> b) b)
+tagImageParserGenerator input =
+    List.concatMap (\{sectionId,groups} ->
+        List.map (\{tagId} -> UrlParser.map (\itemId -> TagImageRoute sectionId tagId itemId ) (s sectionId </> s tagId </> string)) groups
+    ) input
+
+tagParserGenerator: AppData ->  List (Parser (Route -> b) b)
+tagParserGenerator input =
+    List.concatMap (\{sectionId,groups} ->
+        List.map (\{tagId} -> UrlParser.map (TagRoute sectionId tagId ) (s sectionId </> s tagId)) groups
+    ) input
+
+sectionImageParserGenerator: AppData -> List (Parser (Route -> b) b)
+sectionImageParserGenerator input =
+        List.map (\{sectionId} -> UrlParser.map (\itemId -> SectionImageRoute sectionId itemId ) (s sectionId </> string)) input
+
+sectionParserGenerator: AppData -> List (Parser (Route -> b) b)
+sectionParserGenerator input =
+        List.map (\{sectionId} -> UrlParser.map (SectionRoute sectionId ) (s sectionId)) input
+
+
+routeParser : AppData -> Parser (Route -> a) a
+routeParser data = oneOf
+    [ UrlParser.map Root top
+    , UrlParser.map InfoRoute (s "info")
+    , oneOf (tagImageParserGenerator data)
+    , oneOf (tagParserGenerator data)
+    , oneOf (sectionImageParserGenerator data)
+    , oneOf (sectionParserGenerator data)
+    ]
+
+parseToRoute url data =
+    Maybe.withDefault Root (parse (routeParser data) url )
