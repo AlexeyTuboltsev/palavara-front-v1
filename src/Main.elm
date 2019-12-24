@@ -32,7 +32,7 @@ type alias SectionId =
 type alias TagId = String
 type alias ItemId = String
 
-type alias GroupData =
+type alias TagData =
     { label : String
     , tagId : TagId
     , itemOrder : List ItemId
@@ -44,12 +44,27 @@ type alias ItemData =
     , height : Int
     }
 
-type alias SectionData =
+type SectionData =
+    GalleryWithTagsSectionType GalleryWithTagsSectionData
+    | GallerySectionType GallerySectionData
+    | InfoSectionType InfoSectionData
+
+type alias GalleryWithTagsSectionData =
     { label : String
     , sectionId : SectionId
     , items: Dict ItemId ItemData
     , itemOrder: List ItemId
-    , groups : List GroupData
+    , tags : List TagData
+    }
+
+type alias InfoSectionData =
+    { label : String
+    , sectionId : SectionId
+    }
+
+type alias GallerySectionData =
+    { label : String
+    , sectionId : SectionId
     }
 
 type alias AppData = List SectionData
@@ -322,14 +337,20 @@ routeToPage route appData =
     case route of
         Root ->
             let
-                menuTagData groups =
+                menuTagData tags =
                      List.map
                      (\{tagId, label } ->
                          MenuTagData tagId label False NoOp
-                     )  groups
+                     )  tags
                 menuData =  List.map
-                    (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label False (menuTagData groups) NoOp
+                    (\section ->
+                        case section of
+                            GalleryWithTagsSectionType {sectionId,label,tags} ->
+                                MenuSectionData sectionId label False (menuTagData tags) NoOp
+                            GallerySectionType {sectionId, label} ->
+                                MenuSectionData sectionId label False [] NoOp
+                            InfoSectionType {sectionId, label} ->
+                                MenuSectionData sectionId label False [] NoOp
                     ) appData
             in
             StartPage <| StartPageData menuData
@@ -341,8 +362,14 @@ routeToPage route appData =
                          MenuTagData tagId label False NoOp
                      )  groups
                 menuData =  List.map
-                    (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label True (menuTagData groups) NoOp
+                    (\section ->
+                        case section of
+                            GalleryWithTagsSectionType {sectionId,label,tags} ->
+                                MenuSectionData sectionId label False (menuTagData tags) NoOp
+                            GallerySectionType {sectionId, label} ->
+                                MenuSectionData sectionId label False [] NoOp
+                            InfoSectionType {sectionId, label} ->
+                                MenuSectionData sectionId label False [] NoOp
                     ) appData
             in
             InfoPage <| InfoPageData menuData
@@ -353,10 +380,17 @@ routeToPage route appData =
                      (\{tagId, label } ->
                          MenuTagData tagId label False NoOp
                      )  groups
+
                  menuData =  List.map
-                    (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData groups) NoOp
-                    ) appData
+                     (\section ->
+                         case section of
+                             GalleryWithTagsSectionType {sectionId,label,tags} ->
+                                 MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData tags) NoOp
+                             GallerySectionType {sectionId, label} ->
+                                 MenuSectionData sectionId label False [] NoOp
+                             InfoSectionType {sectionId, label} ->
+                                 MenuSectionData sectionId label False [] NoOp
+                     ) appData
              in
              ListPage <| ListPageData menuData
         TagRoute activeSectionId activeTagId ->
@@ -367,9 +401,15 @@ routeToPage route appData =
                          MenuTagData tagId label (isTagActive tagId activeTagId) NoOp
                      )  groups
                 menuData =  List.map
-                    (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData groups) NoOp
-                    ) appData
+                     (\section ->
+                         case section of
+                             GalleryWithTagsSectionType {sectionId,label,tags} ->
+                                 MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData tags) NoOp
+                             GallerySectionType {sectionId, label} ->
+                                 MenuSectionData sectionId label False [] NoOp
+                             InfoSectionType {sectionId, label} ->
+                                 MenuSectionData sectionId label False [] NoOp
+                     ) appData
             in
             ListPage <| ListPageData menuData
         SectionImageRoute activeSectionId imageId ->
@@ -379,10 +419,17 @@ routeToPage route appData =
                      (\{tagId, label } ->
                          MenuTagData tagId label False NoOp
                      )  groups
+
                 menuData =  List.map
-                    (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData groups) NoOp
-                    ) appData
+                     (\section ->
+                         case section of
+                             GalleryWithTagsSectionType {sectionId,label,tags} ->
+                                 MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData tags) NoOp
+                             GallerySectionType {sectionId, label} ->
+                                 MenuSectionData sectionId label False [] NoOp
+                             InfoSectionType {sectionId, label} ->
+                                 MenuSectionData sectionId label False [] NoOp
+                     ) appData
             in
             ContentPage <| ContentPageData menuData
         TagImageRoute activeSectionId activeTagId imageId ->
@@ -392,10 +439,17 @@ routeToPage route appData =
                      (\{tagId, label } ->
                          MenuTagData tagId label (isTagActive tagId activeTagId) NoOp
                      )  groups
+
                  menuData =  List.map
-                    (\{sectionId,label,groups} ->
-                        MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData groups) NoOp
-                    ) appData
+                      (\section ->
+                          case section of
+                              GalleryWithTagsSectionType {sectionId,label,tags} ->
+                                  MenuSectionData sectionId label (isSectionActive sectionId activeSectionId) (menuTagData tags) NoOp
+                              GallerySectionType {sectionId, label} ->
+                                  MenuSectionData sectionId label False [] NoOp
+                              InfoSectionType {sectionId, label} ->
+                                  MenuSectionData sectionId label False [] NoOp
+                      ) appData
             in
             ContentPage <| ContentPageData menuData
 
@@ -421,11 +475,11 @@ itemDataDecoder =
 itemIdDecoder =
      (JD.field "itemId" JD.string)
 
-groupDataDecoder: JD.Decoder GroupData
-groupDataDecoder =
-    JD.map3 GroupData
+tagDataDecoder: JD.Decoder TagData
+tagDataDecoder =
+    JD.map3 TagData
         (JD.field "label" JD.string)
-        (JD.field "groupId" JD.string)
+        (JD.field "tagId" JD.string)
         (JD.field "items" (JD.list itemIdDecoder))
 
 itemsDecoder =
@@ -439,40 +493,104 @@ itemOrderDecoder =
 
 sectionDataDecoder: JD.Decoder SectionData
 sectionDataDecoder =
-    JD.map5 SectionData
-        (JD.field "label" JD.string)
-        (JD.field "sectionId" JD.string)
-        (JD.field "items" itemsDecoder)
-        (JD.field "items" itemOrderDecoder)
-        (JD.field "groups" (JD.list groupDataDecoder))
+        JD.field "type" JD.string
+        |> JD.andThen
+            (\sectionType ->
+                case sectionType of
+                    "galleryWithTags" ->
+                        JD.map5 GalleryWithTagsSectionData
+                            (JD.field "label" JD.string)
+                            (JD.field "sectionId" JD.string)
+                            (JD.field "items" itemsDecoder)
+                            (JD.field "items" itemOrderDecoder)
+                            (JD.field "tags" (JD.list tagDataDecoder))
+                        |> JD.map GalleryWithTagsSectionType
+                    "gallery" ->
+                        JD.map2 GallerySectionData
+                            (JD.field "label" JD.string)
+                            (JD.field "sectionId" JD.string)
+                        |> JD.map GallerySectionType
+                    "info" ->
+                        JD.map2 InfoSectionData
+                            (JD.field "label" JD.string)
+                            (JD.field "sectionId" JD.string)
+                        |> JD.map InfoSectionType
+                    _ -> JD.fail "no luck today"
+            )
+
 
 -- URL PARSING --
 
 tagImageParserGenerator: AppData -> List (Parser (Route -> b) b)
 tagImageParserGenerator input =
-    List.concatMap (\{sectionId,groups} ->
-        List.map (\{tagId} -> UrlParser.map (\itemId -> TagImageRoute sectionId tagId itemId ) (s sectionId </> s tagId </> string)) groups
-    ) input
+    List.filter (\section ->
+        case section of
+            GalleryWithTagsSectionType _ -> True
+            _ -> False
+        ) input
+    |> List.concatMap (\section ->
+        case section of
+            GalleryWithTagsSectionType {sectionId, tags} ->
+                List.map (\{tagId} -> UrlParser.map (\itemId -> TagImageRoute sectionId tagId itemId ) (s sectionId </> s tagId </> string)
+                    ) tags
+            GallerySectionType _ ->
+                [UrlParser.map Root top]
+            InfoSectionType _ ->
+                [UrlParser.map Root top]
+        )
 
 tagParserGenerator: AppData ->  List (Parser (Route -> b) b)
 tagParserGenerator input =
-    List.concatMap (\{sectionId,groups} ->
-        List.map (\{tagId} -> UrlParser.map (TagRoute sectionId tagId ) (s sectionId </> s tagId)) groups
-    ) input
+    List.filter (\section ->
+            case section of
+                GalleryWithTagsSectionType _ -> True
+                _ -> False
+            ) input
+    |> List.concatMap (\section ->
+        case section of
+            GalleryWithTagsSectionType {sectionId, tags} ->
+                List.map (\{tagId} -> UrlParser.map (TagRoute sectionId tagId ) (s sectionId </> s tagId)) tags
+            GallerySectionType _ ->
+                            [UrlParser.map Root top]
+            InfoSectionType _ ->
+                [UrlParser.map Root top]
+        )
+
 
 sectionImageParserGenerator: AppData -> List (Parser (Route -> b) b)
 sectionImageParserGenerator input =
-        List.map (\{sectionId} -> UrlParser.map (\itemId -> SectionImageRoute sectionId itemId ) (s sectionId </> string)) input
+    List.filter (\section ->
+        case section of
+            GalleryWithTagsSectionType _ -> True
+            _ -> False
+        ) input
+    |> List.map (\section ->
+            case section of
+                GalleryWithTagsSectionType {sectionId} ->
+                    UrlParser.map (\itemId -> SectionImageRoute sectionId itemId ) (s sectionId </> string)
+                GallerySectionType _ ->
+                    UrlParser.map Root top
+                InfoSectionType _ ->
+                    UrlParser.map Root top
+            )
 
 sectionParserGenerator: AppData -> List (Parser (Route -> b) b)
 sectionParserGenerator input =
-        List.map (\{sectionId} -> UrlParser.map (SectionRoute sectionId ) (s sectionId)) input
+        List.map (\section ->
+            case section of
+                GalleryWithTagsSectionType {sectionId} ->
+                    UrlParser.map (SectionRoute sectionId ) (s sectionId)
+                GallerySectionType {sectionId} ->
+                    UrlParser.map (SectionRoute sectionId ) (s sectionId)
+                InfoSectionType {sectionId} ->
+                    UrlParser.map (SectionRoute sectionId ) (s sectionId)
+            ) input
 
 
 routeParser : AppData -> Parser (Route -> a) a
 routeParser data = oneOf
     [ UrlParser.map Root top
-    , UrlParser.map InfoRoute (s "info")
+    --, UrlParser.map InfoRoute (s "info")
     , oneOf (tagImageParserGenerator data)
     , oneOf (tagParserGenerator data)
     , oneOf (sectionImageParserGenerator data)
