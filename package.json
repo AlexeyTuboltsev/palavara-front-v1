@@ -15,7 +15,7 @@
     "make": "elm-make",
     "repl": "elm-repl",
     "reactor": "elm-reactor",
-    "test": "elm-test",
+    "test": " ./node_modules/elm-test/bin/elm-test",
     "dev": "webpack-dev-server --hot --colors --port 3000",
     "prod": "webpack -p",
     "analyse": "elm-analyse -s -p 3001 -o"
