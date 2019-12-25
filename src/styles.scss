@@ -1,20 +1,20 @@
 @font-face {
   font-family: 'Brutal Type';
-  src: local("Brutal Type Bold"), local("BrutalType-Bold"), url("../fonts/BrutalType-Bold.woff2") format("woff2"), url("../fonts/BrutalType-Bold.woff") format("woff");
+  src: local("Brutal Type Bold"), local("BrutalType-Bold"), url("../public/fonts/BrutalType-Bold.woff2") format("woff2"), url("../public/fonts/BrutalType-Bold.woff") format("woff");
   font-weight: bold;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Brutal Type';
-  src: local("Brutal Type Medium"), local("BrutalType-Medium"), url("../fonts/BrutalType-Medium.woff2") format("woff2"), url("../fonts/BrutalType-Medium.woff") format("woff");
+  src: local("Brutal Type Medium"), local("BrutalType-Medium"), url("../public/fonts/BrutalType-Medium.woff2") format("woff2"), url("../public/fonts/BrutalType-Medium.woff") format("woff");
   font-weight: 500;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Brutal Type';
-  src: local("Brutal Type Regular"), local("BrutalType-Regular"), url("../fonts/BrutalType.woff2") format("woff2"), url("../fonts/BrutalType.woff") format("woff");
+  src: local("Brutal Type Regular"), local("BrutalType-Regular"), url("../public/fonts/BrutalType.woff2") format("woff2"), url("../public/fonts/BrutalType.woff") format("woff");
   font-weight: normal;
   font-style: normal;
 }
@@ -124,7 +124,7 @@ body {
 .image-start {
   height: 7.25rem;
   width: 100%;
-  background: center center url("../img/0.jpg") no-repeat;
+  background: center center url("../public/img/0.jpg") no-repeat;
   background-size: cover;
 
   @media screen and (max-height: 375px) and (orientation: landscape) {
@@ -283,10 +283,6 @@ body {
   }
 }
 
-
-
-
-
 .logo-image {
   display: flex;
   justify-content: center;
@@ -393,6 +389,10 @@ body {
     font-weight: bold;
     line-height: 144%;
     margin: 0.7rem 0;
+
+    &:before {
+      display: none;
+    }
   }
 
   & a {

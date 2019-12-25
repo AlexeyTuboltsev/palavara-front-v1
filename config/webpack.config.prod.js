@@ -1,74 +1,30 @@
 'use strict';
 
-const autoprefixer = require('autoprefixer');
 const SWPrecacheWebpackPlugin = require('sw-precache-webpack-plugin');
 const DefinePlugin = require('webpack/lib/DefinePlugin');
-const UglifyJsPlugin = require('webpack/lib/optimize/UglifyJsPlugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const AssetsPlugin = require('assets-webpack-plugin');
 const InterpolateHtmlPlugin = require('react-dev-utils/InterpolateHtmlPlugin');
 const getClientEnvironment = require('./env');
 const paths = require('../config/paths');
 const prodConfig = require('./prodConfig')
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const TerserPlugin = require('terser-webpack-plugin')
 
 // Webpack uses `publicPath` to determine where the app is being served from.
 // It requires a trailing slash, or the file assets will get an incorrect path.
 const publicPath = paths.servedPath;
 // Some apps do not use client-side routing with pushState.
 // For these, "homepage" can be set to "." to enable relative asset paths.
-const shouldUseRelativeAssetPaths = publicPath === './';
-// `publicUrl` is just like `publicPath`, but we will provide it to our app
-// as %PUBLIC_URL% in `index.html` and `process.env.PUBLIC_URL` in JavaScript.
-// Omit trailing slash as %PUBLIC_URL%/xyz looks better than %PUBLIC_URL%xyz.
 const publicUrl = publicPath.slice(0, -1);
 
 // Get environment variables to inject into our app.
 const env = getClientEnvironment(publicUrl);
 
-// Note: defined here because it will be used more than once.
-const cssFilename = 'static/css/[name].[contenthash:8].css';
-
-// ExtractTextPlugin expects the build output to be flat.
-// (See https://github.com/webpack-contrib/extract-text-webpack-plugin/issues/27)
-// However, our output is structured with css, js and media folders.
-// To have this structure working with relative paths, we have to use custom options.
-const extractTextPluginOptions = shouldUseRelativeAssetPaths
-  ? // Making sure that the publicPath goes back to to build folder.
-    { publicPath: Array(cssFilename.split('/').length).join('../') }
-  : {};
-
-// Enable users to turn on dead code elimination.
-const deadCodeElimination =
-  process.env.DEAD_CODE_ELIMINATION === 'true'
-    ? {
-        dead_code: true,
-        pure_funcs: [
-          '_elm_lang$core$Native_Utils.update',
-          'A2',
-          'A3',
-          'A4',
-          'A5',
-          'A6',
-          'A7',
-          'A8',
-          'A9',
-          'F2',
-          'F3',
-          'F4',
-          'F5',
-          'F6',
-          'F7',
-          'F8',
-          'F9'
-        ]
-      }
-    : {};
-
 module.exports = {
   // Don't attempt to continue if there are any errors.
   bail: true,
-
+  mode: 'production',
   entry: [paths.appIndexJs],
 
   output: {
@@ -82,12 +38,12 @@ module.exports = {
     pathinfo: true,
 
     // Generated JS files.
-    filename: 'static/js/[name].[chunkhash:8].js'
+    filename: '[name].[chunkhash:8].js'
   },
 
   resolve: {
     modules: ['node_modules'],
-    extensions: ['.js', '.elm']
+    extensions: ['.js', '.elm',]
   },
 
   module: {
@@ -98,37 +54,6 @@ module.exports = {
         test: /\.js$/,
         exclude: [/elm-stuff/, /node_modules/],
         loader: require.resolve('babel-loader'),
-        query: {
-          // Latest stable ECMAScript features
-          presets: [
-            [
-              require.resolve('babel-preset-env'),
-              {
-                targets: {
-                  // React parses on ie 9, so we should too
-                  ie: 9,
-                  // We currently minify with uglify
-                  // Remove after https://github.com/mishoo/UglifyJS2/issues/448
-                  uglify: true
-                },
-                // Disable polyfill transforms
-                useBuiltIns: false,
-                // Do not transform modules to CJS
-                modules: false
-              }
-            ]
-          ],
-          plugins: [
-            [
-              require.resolve('babel-plugin-transform-runtime'),
-              {
-                helpers: false,
-                polyfill: false,
-                regenerator: true
-              }
-            ]
-          ]
-        }
       },
       {
         test: /\.elm$/,
@@ -136,100 +61,63 @@ module.exports = {
         use: {
           loader: "elm-webpack-loader",
           options: {
-            optimize: true
+            optimize: true,
+            files: [
+              paths.elmEntry
+            ]
           }
         }
       },
       {
-        test: /\.css$/,
-        use: ExtractTextPlugin.extract(
-          Object.assign(
+        test: /\.s(a|c)ss$/,
+          use: [
+            {loader: MiniCssExtractPlugin.loader},
+            {loader: 'css-loader'},
             {
-              fallback: require.resolve('style-loader'),
-              use: [
-                {
-                  loader: require.resolve('css-loader'),
-                  options: {
-                    minimize: true
-                  }
-                },
-                {
-                  loader: require.resolve('postcss-loader'),
-                  options: {
-                    ident: 'postcss', // https://webpack.js.org/guides/migrating/#complex-options
-                    plugins: () => [
-                      autoprefixer({
-                        browsers: [
-                          '>1%',
-                          'last 4 versions',
-                          'Firefox ESR',
-                          'not ie < 9'
-                        ]
-                      })
-                    ]
-                  }
-                }
-              ]
-            },
-            extractTextPluginOptions
-          )
-        )
+              loader: 'sass-loader',
+              options: {
+                sourceMap: false
+              }
+          }
+        ]
       },
-
       {
-        exclude: [/\.html$/, /\.js$/, /\.elm$/, /\.css$/, /\.json$/, /\.svg$/],
+        test: /\.(eot|ttf|woff|woff2)$/i,
         loader: require.resolve('url-loader'),
         options: {
           limit: 10000,
-          name: 'static/media/[name].[hash:8].[ext]'
+          name: 'fonts/[name].[hash:8].[ext]'
         }
       },
-      // "file" loader for svg
       {
-        test: /\.svg$/,
-        loader: require.resolve('file-loader'),
+        test: /\.(png|jpe?g|gif|svg)$/i,
+        loader: require.resolve('url-loader'),
         options: {
-          name: 'static/media/[name].[hash:8].[ext]'
+          limit: 10000,
+          name: 'img/[name].[hash:8].[ext]'
         }
-      }
+      },
     ]
   },
   optimization: {
     minimizer: [
-      new ClosurePlugin({mode: 'STANDARD'}, {
-        // compiler flags here
-        //
-        // for debugging help, try these:
-        //
-        // formatting: 'PRETTY_PRINT',
-        // debug: true
-        // renaming: false
-      })
+      new TerserPlugin({
+        cache: true,
+        parallel: true,
+        sourceMap: true, // Must be set to true if using source-maps in production
+        terserOptions: {
+          // https://github.com/webpack-contrib/terser-webpack-plugin#terseroptions
+        }
+      }),
     ]
   },
   plugins: [
-    new AssetsPlugin({ path: paths.appBuild }),
+    // new AssetsPlugin({ path: paths.appBuild, prettyPrint:true }),
 
     new DefinePlugin({
       ...env.stringified,
       ...prodConfig
     }),
-
-    new InterpolateHtmlPlugin(env.raw),
-
-    // // Minify the compiled JavaScript.
-    // new UglifyJsPlugin({
-    //   compress: Object.assign(
-    //     {
-    //       warnings: false
-    //     },
-    //     deadCodeElimination
-    //   ),
-    //   output: {
-    //     comments: false
-    //   }
-    // }),
-
     new HtmlWebpackPlugin({
       inject: true,
       template: paths.appHtml,
@@ -246,10 +134,13 @@ module.exports = {
         minifyURLs: true
       }
     }),
+    new InterpolateHtmlPlugin(HtmlWebpackPlugin,env.raw),
 
-    // Note: this won't work without ExtractTextPlugin.extract(..) in `loaders`.
-    new ExtractTextPlugin({
-      filename: cssFilename
+    new MiniCssExtractPlugin({
+      // Options similar to the same options in webpackOptions.output
+      // both options are optional
+      filename: "[name]-[hash].css",
+      chunkFilename: '[id].[hash].css'
     }),
 
     // Generate a service worker script that will precache, and keep up to date,

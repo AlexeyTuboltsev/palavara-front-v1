@@ -47,6 +47,8 @@ module.exports = {
   entry: resolveApp('./src/index.js'),
   appBuild: resolveApp('./build'),
   elmPackageJson: resolveApp('./elm.json'),
+  elmEntry: resolveApp('./src/Main.elm'),
+  elmEntry1: resolveApp('./src/Icons.elm'),
   // elmMake: require('elm/platform').executablePaths['elm-make'],
   publicUrl: "/",  //getPublicUrl(resolveApp('elm-package.json')),
   servedPath: "/"  //getServedPath(resolveApp('elm-package.json'))

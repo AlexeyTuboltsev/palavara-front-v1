@@ -35,7 +35,7 @@ module.exports = {
   },
   resolve: {
     modules: ['node_modules'],
-    extensions: [".js", ".elm", ".scss", ".png"]
+    extensions: [".js", ".elm"]
   },
   module: {
     // noParse: /\.elm$/,
@@ -65,12 +65,11 @@ module.exports = {
         test: /\.scss$/,
         exclude: [/elm-stuff/, /node_modules/],
         // see https://github.com/webpack-contrib/css-loader#url
-        loaders: [
+        use: [
           {loader:"style-loader"},
-          {loader: "css-loader?url=false"},
+          {loader: "css-loader"},
           {loader: "sass-loader"}
         ]
-        // use: ["style-loader", "css-loader?url=false", "sass-loader"]
       },
       {
         test: /\.css$/,
@@ -98,7 +97,6 @@ module.exports = {
               ]
             }
           }
-          // 'sass-loader'
         ]
       },
 
@@ -107,14 +105,14 @@ module.exports = {
         loader: require.resolve('url-loader'),
         options: {
           limit: 10000,
-          name: 'static/media/[name].[hash:8].[ext]'
+          name: '[name].[hash:8].[ext]'
         }
       },
       {
         test: /\.svg$/,
         loader: require.resolve('file-loader'),
         options: {
-          name: 'static/media/[name].[hash:8].[ext]'
+          name: '[name].[hash:8].[ext]'
         }
       }
     ]
