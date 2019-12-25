@@ -1,5 +1,6 @@
-module Example exposing (..)
+module Routing exposing (..)
 
+import AppData exposing (..)
 import Dict
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)

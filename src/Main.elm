@@ -1,19 +1,16 @@
 module Main exposing (..)
 
-import Array exposing (Array)
+import AppData exposing (..)
 import Browser
 import Browser.Dom exposing (Viewport, getViewport)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation
-import Constants exposing (sectionList, tagList)
 import Debug
-import Dict exposing (Dict)
 import Html exposing (Html, a, br, div, span, text)
 import Html.Attributes exposing (class, href)
 import Html.Events.Extra exposing (onClickPreventDefault)
 import Http exposing (expectJson, get)
 import Icons
-import Json.Decode as JD
 import Result exposing (Result)
 import Task
 import Url exposing (Url)
@@ -26,63 +23,6 @@ type alias Flags =
     , apiPort : String
     , apiUrl : String
     }
-
-
-type alias SectionId =
-    String
-
-
-type alias TagId =
-    String
-
-
-type alias ItemId =
-    String
-
-
-type alias TagData =
-    { label : String
-    , tagId : TagId
-    , itemOrder : List ItemId
-    }
-
-
-type alias ItemData =
-    { itemId : ItemId
-    , width : Int
-    , height : Int
-    }
-
-
-type SectionData
-    = GalleryWithTagsSectionType GalleryWithTagsSectionData
-    | GallerySectionType GallerySectionData
-    | InfoSectionType InfoSectionData
-
-
-type alias GalleryWithTagsSectionData =
-    { label : String
-    , sectionId : SectionId
-    , items : Dict ItemId ItemData
-    , itemOrder : List ItemId
-    , tags : List TagData
-    }
-
-
-type alias InfoSectionData =
-    { label : String
-    , sectionId : SectionId
-    }
-
-
-type alias GallerySectionData =
-    { label : String
-    , sectionId : SectionId
-    }
-
-
-type alias AppData =
-    List SectionData
 
 
 type Route
@@ -108,6 +48,7 @@ type alias MenuSectionData =
     , sectionIsActive : Bool
     , tags : List MenuTagData
     , onClickMessage : Msg
+    , urlString : String
     }
 
 
@@ -123,8 +64,8 @@ type ListPageData
     = ListPageData MenuData
 
 
-type ContentPageData
-    = ContentPageData MenuData
+type GalleryPageData
+    = GalleryPageData MenuData
 
 
 type InfoPageData
@@ -135,7 +76,7 @@ type Page
     = StartPage StartPageData
     | InfoPage InfoPageData
     | ListPage ListPageData
-    | ContentPage ContentPageData
+    | GalleryPage GalleryPageData
 
 
 type alias ReadyModelData =
@@ -221,9 +162,23 @@ update message model =
                 SetRoute route ->
                     let
                         newUrl =
-                            routeToUrl route
+                            routeToUrlPath route
                     in
                     ( ReadyModel { readyModelData | route = route, page = routeToPage route readyModelData.data }, Navigation.pushUrl readyModelData.key newUrl )
+
+                UrlChanged url ->
+                    if url.path == routeToUrlPath readyModelData.route then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            route =
+                                parseToRoute url readyModelData.data
+
+                            page =
+                                routeToPage route readyModelData.data
+                        in
+                        ( ReadyModel { readyModelData | route = route, page = page }, Navigation.pushUrl readyModelData.key <| Url.toString url )
 
                 _ ->
                     ( model, Cmd.none )
@@ -250,7 +205,7 @@ initProgress url key data =
             parseToRoute url data
 
         newUrl =
-            routeToUrl route
+            routeToUrlPath route
     in
     ( InitProgressModel
         { key = key
@@ -313,18 +268,18 @@ contentPage page =
         InfoPage data ->
             infoPage data
 
-        ListPage _ ->
-            []
+        ListPage data ->
+            listPage data
 
-        ContentPage _ ->
-            []
+        GalleryPage data ->
+            galleryPage data
 
 
 startPage : StartPageData -> List (Html Msg)
 startPage data =
     case data of
         StartPageData menuData ->
-            [ div [ class "start" ]
+            [ div [ class "layout" ]
                 [ div [ class "image-start" ] []
                 , buildFullMenu menuData
                 ]
@@ -335,7 +290,29 @@ infoPage : InfoPageData -> List (Html Msg)
 infoPage data =
     case data of
         InfoPageData menuData ->
-            [ div [ class "info" ]
+            [ div [ class "layout" ]
+                [ div [] []
+                , buildFullMenu menuData
+                ]
+            ]
+
+
+listPage : ListPageData -> List (Html Msg)
+listPage data =
+    case data of
+        ListPageData menuData ->
+            [ div [ class "layout" ]
+                [ div [] []
+                , buildFullMenu menuData
+                ]
+            ]
+
+
+galleryPage : GalleryPageData -> List (Html Msg)
+galleryPage data =
+    case data of
+        GalleryPageData menuData ->
+            [ div [ class "layout" ]
                 [ div [] []
                 , buildFullMenu menuData
                 ]
@@ -391,7 +368,7 @@ buildEntry sectionData =
                        )
                 )
             ]
-            [ a [ onClickPreventDefault sectionData.onClickMessage ] [ text <| sectionData.sectionLabel ++ ":" ] ]
+            [ a [ onClickPreventDefault sectionData.onClickMessage, href sectionData.urlString ] [ text <| sectionData.sectionLabel ++ ":" ] ]
         , div [ class "menu-entry-groups" ] (buildGroups sectionData.tags)
         ]
 
@@ -428,7 +405,8 @@ buildGroup tagData =
 -- ROUTING
 
 
-routeToUrl route =
+routeToUrlPath : Route -> String
+routeToUrlPath route =
     case route of
         Root ->
             absolute [] []
@@ -449,166 +427,111 @@ routeToUrl route =
             absolute [ sectionId, tagId, imageId ] []
 
 
+makeRootMenuData section =
+    case section of
+        GalleryWithTagsSectionType { sectionId, label, tags } ->
+            makeMenuEntryData False sectionId label (SectionRoute sectionId) (makeMenuTagData tags sectionId)
+
+        GallerySectionType { sectionId, label } ->
+            MenuSectionData sectionId label False [] (SetRoute <| SectionRoute sectionId) (routeToUrlPath <| SectionRoute sectionId)
+
+        InfoSectionType { sectionId, label } ->
+            makeMenuEntryData False sectionId label InfoRoute []
+
+
+makeInfoMenuData section =
+    case section of
+        GalleryWithTagsSectionType { sectionId, label, tags } ->
+            makeMenuEntryData False sectionId label (SectionRoute sectionId) (makeMenuTagData tags sectionId)
+
+        GallerySectionType { sectionId, label } ->
+            MenuSectionData sectionId label False [] NoOp ""
+
+        InfoSectionType { sectionId, label } ->
+            makeMenuEntryData True sectionId label InfoRoute []
+
+
+makeSectionMenuData activeSectionId sections =
+    makeSectionMenuDataInternal activeSectionId sections makeMenuTagData
+
+
+makeTagMenuData activeSectionId activeTagId sections =
+    makeMenuTagDataWithActiveTag activeTagId
+        |> makeSectionMenuDataInternal activeSectionId sections
+
+
+makeSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
+    List.map
+        (\section ->
+            case section of
+                GalleryWithTagsSectionType { sectionId, label, tags } ->
+                    let
+                        sectionIsActive =
+                            isSectionActive activeSectionId sectionId
+                    in
+                    tagMenuGeneratingFn tags sectionId
+                        |> makeMenuEntryData sectionIsActive sectionId label (SectionRoute sectionId)
+
+                GallerySectionType { sectionId, label } ->
+                    MenuSectionData sectionId label False [] NoOp ""
+
+                InfoSectionType { sectionId, label } ->
+                    makeMenuEntryData False sectionId label InfoRoute []
+        )
+        sections
+
+
+generateMenuEntryAttributes : Bool -> Route -> { sectionIsActive : Bool, onClickMessage : Msg, urlString : String }
+generateMenuEntryAttributes sectionIsActive nextRoute =
+    case sectionIsActive of
+        False ->
+            { sectionIsActive = False, onClickMessage = SetRoute <| nextRoute, urlString = routeToUrlPath nextRoute }
+
+        True ->
+            { sectionIsActive = False, onClickMessage = NoOp, urlString = "" }
+
+
+makeMenuEntryData : Bool -> SectionId -> String -> Route -> List MenuTagData -> MenuSectionData
+makeMenuEntryData sectionIsActive sectionId label nextRoute tagMenuData =
+    let
+        menuEntryAttributes =
+            generateMenuEntryAttributes sectionIsActive nextRoute
+    in
+    MenuSectionData sectionId label menuEntryAttributes.sectionIsActive tagMenuData menuEntryAttributes.onClickMessage menuEntryAttributes.urlString
+
+
 routeToPage : Route -> AppData -> Page
 routeToPage route appData =
     case route of
         Root ->
-            let
-                menuData =
-                    List.map
-                        (\section ->
-                            case section of
-                                GalleryWithTagsSectionType { sectionId, label, tags } ->
-                                    MenuSectionData sectionId label False (makeMenuTagData tags sectionId) (SetRoute <| SectionRoute sectionId)
-
-                                GallerySectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] (SetRoute <| SectionRoute sectionId)
-
-                                InfoSectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] (SetRoute <| InfoRoute)
-                        )
-                        appData
-            in
-            StartPage <| StartPageData menuData
+            List.map makeRootMenuData appData
+                |> StartPageData
+                |> StartPage
 
         InfoRoute ->
-            let
-                menuData =
-                    List.map
-                        (\section ->
-                            case section of
-                                GalleryWithTagsSectionType { sectionId, label, tags } ->
-                                    MenuSectionData sectionId label False (makeMenuTagData tags sectionId) (SetRoute <| SectionRoute sectionId)
-
-                                GallerySectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] NoOp
-
-                                InfoSectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label True [] NoOp
-                        )
-                        appData
-            in
-            InfoPage <| InfoPageData menuData
+            List.map makeInfoMenuData appData
+                |> InfoPageData
+                |> InfoPage
 
         SectionRoute activeSectionId ->
-            let
-                menuData =
-                    List.map
-                        (\section ->
-                            case section of
-                                GalleryWithTagsSectionType { sectionId, label, tags } ->
-                                    let
-                                        sectionIsActive =
-                                            isSectionActive sectionId activeSectionId
-
-                                        onClickMessage =
-                                            if sectionIsActive then
-                                                NoOp
-
-                                            else
-                                                SetRoute <| SectionRoute sectionId
-                                    in
-                                    MenuSectionData sectionId label sectionIsActive (makeMenuTagData tags sectionId) onClickMessage
-
-                                GallerySectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] NoOp
-
-                                InfoSectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] NoOp
-                        )
-                        appData
-            in
-            ListPage <| ListPageData menuData
+            makeSectionMenuData activeSectionId appData
+                |> GalleryPageData
+                |> GalleryPage
 
         TagRoute activeSectionId activeTagId ->
-            let
-                menuData =
-                    List.map
-                        (\section ->
-                            case section of
-                                GalleryWithTagsSectionType { sectionId, label, tags } ->
-                                    let
-                                        sectionIsActive =
-                                            isSectionActive sectionId activeSectionId
-
-                                        onClickMessage =
-                                            if sectionIsActive then
-                                                NoOp
-
-                                            else
-                                                SetRoute <| SectionRoute sectionId
-                                    in
-                                    MenuSectionData sectionId label sectionIsActive (makeMenuTagDataWithActiveTag tags sectionId activeTagId) onClickMessage
-
-                                GallerySectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] NoOp
-
-                                InfoSectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] NoOp
-                        )
-                        appData
-            in
-            ListPage <| ListPageData menuData
+            makeTagMenuData activeSectionId activeTagId appData
+                |> GalleryPageData
+                |> GalleryPage
 
         SectionImageRoute activeSectionId imageId ->
-            let
-                menuData =
-                    List.map
-                        (\section ->
-                            case section of
-                                GalleryWithTagsSectionType { sectionId, label, tags } ->
-                                    let
-                                        sectionIsActive =
-                                            isSectionActive sectionId activeSectionId
-
-                                        onClickMessage =
-                                            if sectionIsActive then
-                                                NoOp
-
-                                            else
-                                                SetRoute <| SectionRoute sectionId
-                                    in
-                                    MenuSectionData sectionId label sectionIsActive (makeMenuTagData tags sectionId) onClickMessage
-
-                                GallerySectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] NoOp
-
-                                InfoSectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] NoOp
-                        )
-                        appData
-            in
-            ContentPage <| ContentPageData menuData
+            makeSectionMenuData activeSectionId appData
+                |> GalleryPageData
+                |> GalleryPage
 
         TagImageRoute activeSectionId activeTagId imageId ->
-            let
-                menuData =
-                    List.map
-                        (\section ->
-                            case section of
-                                GalleryWithTagsSectionType { sectionId, label, tags } ->
-                                    let
-                                        sectionIsActive =
-                                            isSectionActive sectionId activeSectionId
-
-                                        onClickMessage =
-                                            if sectionIsActive then
-                                                NoOp
-
-                                            else
-                                                SetRoute <| SectionRoute sectionId
-                                    in
-                                    MenuSectionData sectionId label sectionIsActive (makeMenuTagDataWithActiveTag tags sectionId activeSectionId) onClickMessage
-
-                                GallerySectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] NoOp
-
-                                InfoSectionType { sectionId, label } ->
-                                    MenuSectionData sectionId label False [] NoOp
-                        )
-                        appData
-            in
-            ContentPage <| ContentPageData menuData
+            makeTagMenuData activeSectionId activeTagId appData
+                |> GalleryPageData
+                |> GalleryPage
 
 
 isSectionActive sectionId activeSectionId =
@@ -627,7 +550,8 @@ makeMenuTagData tags sectionId =
         tags
 
 
-makeMenuTagDataWithActiveTag tags sectionId activeTagId =
+makeMenuTagDataWithActiveTag : TagId -> List TagData -> SectionId -> List MenuTagData
+makeMenuTagDataWithActiveTag activeTagId tags sectionId =
     List.map
         (\{ tagId, label } ->
             let
@@ -644,78 +568,6 @@ makeMenuTagDataWithActiveTag tags sectionId activeTagId =
             MenuTagData tagId label tagIsActive onClickMessage
         )
         tags
-
-
-
--- JSON --
-
-
-appDataDecoder : JD.Decoder (List SectionData)
-appDataDecoder =
-    JD.field "sections" (JD.list sectionDataDecoder)
-
-
-itemDataDecoder : JD.Decoder ItemData
-itemDataDecoder =
-    JD.map3 ItemData
-        itemIdDecoder
-        (JD.field "width" JD.int)
-        (JD.field "height" JD.int)
-
-
-itemIdDecoder =
-    JD.field "itemId" JD.string
-
-
-tagDataDecoder : JD.Decoder TagData
-tagDataDecoder =
-    JD.map3 TagData
-        (JD.field "label" JD.string)
-        (JD.field "tagId" JD.string)
-        (JD.field "items" (JD.list itemIdDecoder))
-
-
-itemsDecoder =
-    JD.list itemDataDecoder
-        |> JD.map (\decodedList -> List.map (\item -> ( item.itemId, item )) decodedList)
-        |> JD.map Dict.fromList
-
-
-itemOrderDecoder =
-    JD.list itemDataDecoder
-        |> JD.map (\decodedList -> List.map (\item -> item.itemId) decodedList)
-
-
-sectionDataDecoder : JD.Decoder SectionData
-sectionDataDecoder =
-    JD.field "type" JD.string
-        |> JD.andThen
-            (\sectionType ->
-                case sectionType of
-                    "galleryWithTags" ->
-                        JD.map5 GalleryWithTagsSectionData
-                            (JD.field "label" JD.string)
-                            (JD.field "sectionId" JD.string)
-                            (JD.field "items" itemsDecoder)
-                            (JD.field "items" itemOrderDecoder)
-                            (JD.field "tags" (JD.list tagDataDecoder))
-                            |> JD.map GalleryWithTagsSectionType
-
-                    "gallery" ->
-                        JD.map2 GallerySectionData
-                            (JD.field "label" JD.string)
-                            (JD.field "sectionId" JD.string)
-                            |> JD.map GallerySectionType
-
-                    "info" ->
-                        JD.map2 InfoSectionData
-                            (JD.field "label" JD.string)
-                            (JD.field "sectionId" JD.string)
-                            |> JD.map InfoSectionType
-
-                    _ ->
-                        JD.fail "no luck today"
-            )
 
 
 
