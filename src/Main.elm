@@ -43,13 +43,20 @@ type alias MenuTagData =
 
 
 type alias MenuSectionData =
-    { sectionId : SectionId
+    { sectionType : MenuSectionType
+    , sectionId : SectionId
     , sectionLabel : String
     , sectionIsActive : Bool
     , tags : List MenuTagData
     , onClickMessage : Msg
     , urlString : String
     }
+
+
+type MenuSectionType
+    = GalleryWithTags
+    | Gallery
+    | Info
 
 
 type alias MenuData =
@@ -347,15 +354,24 @@ buildLogo =
         ]
 
 
-
---buildInfoEntry : Html Msg
---buildInfoEntry =
---    div [ class "menu-entry info" ]
---        [ a [ class "menu-entry-label", href "info", onClickPreventDefault <| SetRoute InfoRoute ] [ text "info" ] ]
-
-
 buildEntry : MenuSectionData -> Html Msg
 buildEntry sectionData =
+    case sectionData.sectionType of
+        Info ->
+            buildInfoEntry sectionData
+
+        _ ->
+            buildGalleryWithTagsEntry sectionData
+
+
+buildInfoEntry : MenuSectionData -> Html Msg
+buildInfoEntry sectionData =
+    div [ class "menu-entry info" ]
+        [ a [ class "menu-entry-label", onClickPreventDefault sectionData.onClickMessage, href sectionData.urlString ] [ text sectionData.sectionLabel ] ]
+
+
+buildGalleryWithTagsEntry : MenuSectionData -> Html Msg
+buildGalleryWithTagsEntry sectionData =
     div [ class "menu-entry" ]
         [ div
             [ class
@@ -369,13 +385,13 @@ buildEntry sectionData =
                 )
             ]
             [ a [ onClickPreventDefault sectionData.onClickMessage, href sectionData.urlString ] [ text <| sectionData.sectionLabel ++ ":" ] ]
-        , div [ class "menu-entry-groups" ] (buildGroups sectionData.tags)
+        , div [ class "menu-entry-groups" ] (buildTags sectionData.tags)
         ]
 
 
-buildGroups : List MenuTagData -> List (Html Msg)
-buildGroups tagDataList =
-    List.map (\tagData -> buildGroup tagData) tagDataList
+buildTags : List MenuTagData -> List (Html Msg)
+buildTags tagDataList =
+    List.map (\tagData -> buildTag tagData) tagDataList
         |> List.intersperse
             (span [ class "pipe" ]
                 [ text "\u{00A0}\u{00A0}"
@@ -385,8 +401,8 @@ buildGroups tagDataList =
             )
 
 
-buildGroup : MenuTagData -> Html Msg
-buildGroup tagData =
+buildTag : MenuTagData -> Html Msg
+buildTag tagData =
     a
         [ class
             (if tagData.tagIsActive == True then
@@ -430,25 +446,25 @@ routeToUrlPath route =
 makeRootMenuData section =
     case section of
         GalleryWithTagsSectionType { sectionId, label, tags } ->
-            makeMenuEntryData False sectionId label (SectionRoute sectionId) (makeMenuTagData tags sectionId)
+            makeMenuEntryData GalleryWithTags False sectionId label (SectionRoute sectionId) (makeMenuTagData tags sectionId)
 
         GallerySectionType { sectionId, label } ->
-            MenuSectionData sectionId label False [] (SetRoute <| SectionRoute sectionId) (routeToUrlPath <| SectionRoute sectionId)
+            MenuSectionData Gallery sectionId label False [] (SetRoute <| SectionRoute sectionId) (routeToUrlPath <| SectionRoute sectionId)
 
         InfoSectionType { sectionId, label } ->
-            makeMenuEntryData False sectionId label InfoRoute []
+            makeMenuEntryData Info False sectionId label InfoRoute []
 
 
 makeInfoMenuData section =
     case section of
         GalleryWithTagsSectionType { sectionId, label, tags } ->
-            makeMenuEntryData False sectionId label (SectionRoute sectionId) (makeMenuTagData tags sectionId)
+            makeMenuEntryData GalleryWithTags False sectionId label (SectionRoute sectionId) (makeMenuTagData tags sectionId)
 
         GallerySectionType { sectionId, label } ->
-            MenuSectionData sectionId label False [] NoOp ""
+            MenuSectionData Gallery sectionId label False [] NoOp ""
 
         InfoSectionType { sectionId, label } ->
-            makeMenuEntryData True sectionId label InfoRoute []
+            makeMenuEntryData Info True sectionId label InfoRoute []
 
 
 makeSectionMenuData activeSectionId sections =
@@ -470,13 +486,13 @@ makeSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
                             isSectionActive activeSectionId sectionId
                     in
                     tagMenuGeneratingFn tags sectionId
-                        |> makeMenuEntryData sectionIsActive sectionId label (SectionRoute sectionId)
+                        |> makeMenuEntryData GalleryWithTags sectionIsActive sectionId label (SectionRoute sectionId)
 
                 GallerySectionType { sectionId, label } ->
-                    MenuSectionData sectionId label False [] NoOp ""
+                    MenuSectionData Gallery sectionId label False [] NoOp ""
 
                 InfoSectionType { sectionId, label } ->
-                    makeMenuEntryData False sectionId label InfoRoute []
+                    makeMenuEntryData Info False sectionId label InfoRoute []
         )
         sections
 
@@ -491,13 +507,13 @@ generateMenuEntryAttributes sectionIsActive nextRoute =
             { sectionIsActive = False, onClickMessage = NoOp, urlString = "" }
 
 
-makeMenuEntryData : Bool -> SectionId -> String -> Route -> List MenuTagData -> MenuSectionData
-makeMenuEntryData sectionIsActive sectionId label nextRoute tagMenuData =
+makeMenuEntryData : MenuSectionType -> Bool -> SectionId -> String -> Route -> List MenuTagData -> MenuSectionData
+makeMenuEntryData menuSectionType sectionIsActive sectionId label nextRoute tagMenuData =
     let
         menuEntryAttributes =
             generateMenuEntryAttributes sectionIsActive nextRoute
     in
-    MenuSectionData sectionId label menuEntryAttributes.sectionIsActive tagMenuData menuEntryAttributes.onClickMessage menuEntryAttributes.urlString
+    MenuSectionData menuSectionType sectionId label menuEntryAttributes.sectionIsActive tagMenuData menuEntryAttributes.onClickMessage menuEntryAttributes.urlString
 
 
 routeToPage : Route -> AppData -> Page

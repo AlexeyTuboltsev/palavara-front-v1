@@ -45,6 +45,22 @@ type alias GalleryWithTagsSectionData =
     }
 
 
+type alias InfoSectionData =
+    { label : String
+    , sectionId : SectionId
+    }
+
+
+type alias GallerySectionData =
+    { label : String
+    , sectionId : SectionId
+    }
+
+
+type alias AppData =
+    List SectionData
+
+
 
 -- JSON --
 
@@ -115,19 +131,3 @@ sectionDataDecoder =
                     _ ->
                         JD.fail "no luck today"
             )
-
-
-type alias InfoSectionData =
-    { label : String
-    , sectionId : SectionId
-    }
-
-
-type alias GallerySectionData =
-    { label : String
-    , sectionId : SectionId
-    }
-
-
-type alias AppData =
-    List SectionData

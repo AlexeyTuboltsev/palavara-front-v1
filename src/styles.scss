@@ -269,7 +269,6 @@ body {
       font-weight: 500;
       color: #000045;
       margin: 0;
-      line-height: 30%;
     }
 
     @media screen and (min-width: 1366px) {
@@ -479,8 +478,8 @@ body {
   align-self: end;
 
   @media screen and (min-width: 1024px) {
-    grid-column: 4;
-    grid-row: 2;
+    grid-column: auto;
+    grid-row: 1;
     justify-self: left;
     align-self: end;
     margin: 2rem 0 0 0;
@@ -489,7 +488,7 @@ body {
 
   @media screen and (min-width: 1366px) {
     grid-column: 1;
-    grid-row: 5;
+    grid-row: auto;
     justify-self: left;
     margin: 2rem 0 0 2rem;
   }
