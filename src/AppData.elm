@@ -19,7 +19,7 @@ type alias ItemId =
 type alias TagData =
     { label : String
     , tagId : TagId
-    , itemOrder : List ItemId
+    , items : List ItemData
     }
 
 
@@ -39,8 +39,9 @@ type SectionData
 type alias GalleryWithTagsSectionData =
     { label : String
     , sectionId : SectionId
-    , items : Dict ItemId ItemData
-    , itemOrder : List ItemId
+    , items : List ItemData --Dict ItemId ItemData
+
+    --, itemOrder : List ItemId
     , tags : List TagData
     }
 
@@ -87,13 +88,16 @@ tagDataDecoder =
     JD.map3 TagData
         (JD.field "label" JD.string)
         (JD.field "tagId" JD.string)
-        (JD.field "items" (JD.list itemIdDecoder))
+        (JD.field "items" (JD.list itemDataDecoder))
 
 
 itemsDecoder =
     JD.list itemDataDecoder
-        |> JD.map (\decodedList -> List.map (\item -> ( item.itemId, item )) decodedList)
-        |> JD.map Dict.fromList
+
+
+
+--|> JD.map (\decodedList -> List.map (\item -> ( item.itemId, item )) decodedList)
+--|> JD.map Dict.fromList
 
 
 itemOrderDecoder =
@@ -108,11 +112,11 @@ sectionDataDecoder =
             (\sectionType ->
                 case sectionType of
                     "galleryWithTags" ->
-                        JD.map5 GalleryWithTagsSectionData
+                        JD.map4 GalleryWithTagsSectionData
                             (JD.field "label" JD.string)
                             (JD.field "sectionId" JD.string)
                             (JD.field "items" itemsDecoder)
-                            (JD.field "items" itemOrderDecoder)
+                            --(JD.field "items" itemOrderDecoder)
                             (JD.field "tags" (JD.list tagDataDecoder))
                             |> JD.map GalleryWithTagsSectionType
 

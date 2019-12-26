@@ -6,11 +6,14 @@ import Browser.Dom exposing (Viewport, getViewport)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation
 import Debug
-import Html exposing (Html, a, br, div, span, text)
-import Html.Attributes exposing (class, href)
+import Dict exposing (Dict)
+import Html exposing (Html, a, br, div, img, span, text)
+import Html.Attributes exposing (class, href, id, src)
+import Html.Events exposing (onMouseOut, onMouseOver)
 import Html.Events.Extra exposing (onClickPreventDefault)
 import Http exposing (expectJson, get)
 import Icons
+import List.Extra exposing (find)
 import Result exposing (Result)
 import Task
 import Url exposing (Url)
@@ -63,6 +66,19 @@ type alias MenuData =
     List MenuSectionData
 
 
+type alias ItemContentData =
+    { itemId : ItemId
+    , urlString : String
+    , onClickMessage : Msg
+    , width : Int
+    , height : Int
+    }
+
+
+type alias ContentData =
+    { items : List ItemContentData }
+
+
 type StartPageData
     = StartPageData MenuData
 
@@ -72,7 +88,7 @@ type ListPageData
 
 
 type GalleryPageData
-    = GalleryPageData MenuData
+    = GalleryPageData MenuData ContentData
 
 
 type InfoPageData
@@ -318,12 +334,41 @@ listPage data =
 galleryPage : GalleryPageData -> List (Html Msg)
 galleryPage data =
     case data of
-        GalleryPageData menuData ->
+        GalleryPageData menuData contentData ->
             [ div [ class "layout" ]
-                [ div [] []
-                , buildFullMenu menuData
+                [ buildFullMenu menuData
+                , div
+                    [ class "slider-window" ]
+                    [ div
+                        [ class "image-group"
+
+                        --, onMouseOver FadeInPictures
+                        --, onMouseOut FadeOutPictures
+                        , id "image-group"
+                        ]
+                        (List.map
+                            (\itemData ->
+                                buildSectionPicture
+                                    itemData.urlString
+                                    itemData.onClickMessage
+                            )
+                         <|
+                            contentData.items
+                        )
+                    ]
                 ]
             ]
+
+
+buildSectionPicture urlString onClickMessage =
+    let
+        _ =
+            Debug.log "buildSectionPicture" urlString
+    in
+    a
+        [ class "image", onClickPreventDefault onClickMessage ]
+        [ img [ src urlString ] []
+        ]
 
 
 buildFullMenu : MenuData -> Html Msg
@@ -530,24 +575,86 @@ routeToPage route appData =
                 |> InfoPage
 
         SectionRoute activeSectionId ->
-            makeSectionMenuData activeSectionId appData
-                |> GalleryPageData
+            GalleryPageData (makeSectionMenuData activeSectionId appData) (makeSectionContentData activeSectionId appData)
                 |> GalleryPage
 
         TagRoute activeSectionId activeTagId ->
-            makeTagMenuData activeSectionId activeTagId appData
-                |> GalleryPageData
+            GalleryPageData (makeTagMenuData activeSectionId activeTagId appData) (makeTagContentData activeSectionId activeTagId appData)
                 |> GalleryPage
 
         SectionImageRoute activeSectionId imageId ->
-            makeSectionMenuData activeSectionId appData
-                |> GalleryPageData
+            GalleryPageData (makeSectionMenuData activeSectionId appData) (makeSectionContentData activeSectionId appData)
                 |> GalleryPage
 
         TagImageRoute activeSectionId activeTagId imageId ->
-            makeTagMenuData activeSectionId activeTagId appData
-                |> GalleryPageData
+            GalleryPageData (makeTagMenuData activeSectionId activeTagId appData) (makeTagContentData activeSectionId activeTagId appData)
                 |> GalleryPage
+
+
+findSection sectionList sectionId =
+    find
+        (\section ->
+            case section of
+                GalleryWithTagsSectionType data ->
+                    data.sectionId == sectionId
+
+                _ ->
+                    False
+        )
+        sectionList
+
+
+makeSectionContentData activeSectionId appData =
+    case findSection appData activeSectionId of
+        Just section ->
+            case section of
+                GalleryWithTagsSectionType { items } ->
+                    let
+                        itemList =
+                            List.map
+                                (\{ itemId, width, height } ->
+                                    ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| SectionImageRoute activeSectionId itemId) width height
+                                )
+                                items
+                    in
+                    { items = itemList }
+
+                _ ->
+                    { items = [] }
+
+        Nothing ->
+            { items = [] }
+
+
+makeTagContentData activeSectionId activeTagId appData =
+    case findSection appData activeSectionId of
+        Just section ->
+            case section of
+                GalleryWithTagsSectionType { tags } ->
+                    let
+                        maybeTagData =
+                            find (\tag -> tag.tagId == activeTagId) tags
+                    in
+                    case maybeTagData of
+                        Just { items } ->
+                            let
+                                itemList =
+                                    List.map
+                                        (\{ itemId, width, height } ->
+                                            ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| TagImageRoute activeSectionId activeTagId itemId) width height
+                                        )
+                                        items
+                            in
+                            { items = itemList }
+
+                        Nothing ->
+                            { items = [] }
+
+                _ ->
+                    { items = [] }
+
+        Nothing ->
+            { items = [] }
 
 
 isSectionActive sectionId activeSectionId =
