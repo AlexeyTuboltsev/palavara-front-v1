@@ -6,11 +6,11 @@ import Browser.Dom exposing (Viewport, getViewport)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation
 import Debug
-import Dict exposing (Dict)
 import Html exposing (Html, a, br, div, img, span, text)
-import Html.Attributes exposing (class, href, id, src)
+import Html.Attributes exposing (class, href, id, src, style)
 import Html.Events exposing (onMouseOut, onMouseOver)
 import Html.Events.Extra exposing (onClickPreventDefault)
+import Html.Events.Extra.Pointer as Pointer
 import Http exposing (expectJson, get)
 import Icons
 import List.Extra exposing (find)
@@ -72,6 +72,7 @@ type alias ItemContentData =
     , onClickMessage : Msg
     , width : Int
     , height : Int
+    , isActive : Bool
     }
 
 
@@ -139,6 +140,9 @@ type Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | SetRoute Route
+    | DownMsg ( Float, Float )
+    | MoveMsg ( Float, Float )
+    | UpMsg ( Float, Float )
 
 
 
@@ -302,7 +306,7 @@ startPage : StartPageData -> List (Html Msg)
 startPage data =
     case data of
         StartPageData menuData ->
-            [ div [ class "layout" ]
+            [ div [ class "start" ]
                 [ div [ class "image-start" ] []
                 , buildFullMenu menuData
                 ]
@@ -337,36 +341,59 @@ galleryPage data =
         GalleryPageData menuData contentData ->
             [ div [ class "layout" ]
                 [ buildFullMenu menuData
-                , div
-                    [ class "slider-window" ]
-                    [ div
-                        [ class "image-group"
-
-                        --, onMouseOver FadeInPictures
-                        --, onMouseOut FadeOutPictures
-                        , id "image-group"
-                        ]
-                        (List.map
-                            (\itemData ->
-                                buildSectionPicture
-                                    itemData.urlString
-                                    itemData.onClickMessage
-                            )
-                         <|
-                            contentData.items
-                        )
-                    ]
+                , buildPictures contentData
                 ]
             ]
 
 
-buildSectionPicture urlString onClickMessage =
-    let
-        _ =
-            Debug.log "buildSectionPicture" urlString
-    in
+initialOffset =
+    150.0
+
+
+pictureHeight =
+    150
+
+
+buildPictures contentData =
+    div
+        [ class "slider-window"
+        , Pointer.onDown (relativePos >> DownMsg)
+        , Pointer.onMove (relativePos >> MoveMsg)
+        , Pointer.onUp (relativePos >> UpMsg)
+        , Pointer.onCancel (relativePos >> UpMsg)
+        ]
+        [ div
+            [ class "image-group"
+            , style "top" (String.fromFloat (initialOffset + pictureHeight * 0) ++ "px")
+
+            --, onMouseOver FadeInPictures
+            --, onMouseOut FadeOutPictures
+            , id "image-group"
+            ]
+            (List.map
+                (\itemData ->
+                    buildSectionPicture
+                        itemData.urlString
+                        itemData.onClickMessage
+                        itemData.isActive
+                )
+             <|
+                contentData.items
+            )
+        ]
+
+
+buildSectionPicture urlString onClickMessage isActive =
     a
-        [ class "image", onClickPreventDefault onClickMessage ]
+        [ class
+            (if isActive then
+                "image active-image"
+
+             else
+                "image"
+            )
+        , onClickPreventDefault onClickMessage
+        ]
         [ img [ src urlString ] []
         ]
 
@@ -521,25 +548,38 @@ makeTagMenuData activeSectionId activeTagId sections =
         |> makeSectionMenuDataInternal activeSectionId sections
 
 
-makeSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
-    List.map
+filterMenuInfoSection sections =
+    List.filter
         (\section ->
             case section of
-                GalleryWithTagsSectionType { sectionId, label, tags } ->
-                    let
-                        sectionIsActive =
-                            isSectionActive activeSectionId sectionId
-                    in
-                    tagMenuGeneratingFn tags sectionId
-                        |> makeMenuEntryData GalleryWithTags sectionIsActive sectionId label (SectionRoute sectionId)
+                InfoSectionType _ ->
+                    True
 
-                GallerySectionType { sectionId, label } ->
-                    MenuSectionData Gallery sectionId label False [] NoOp ""
-
-                InfoSectionType { sectionId, label } ->
-                    makeMenuEntryData Info False sectionId label InfoRoute []
+                _ ->
+                    False
         )
         sections
+
+
+makeSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
+    filterMenuInfoSection sections
+        |> List.map
+            (\section ->
+                case section of
+                    InfoSectionType { sectionId, label } ->
+                        makeMenuEntryData Info False sectionId label InfoRoute []
+
+                    GalleryWithTagsSectionType { sectionId, label, tags } ->
+                        let
+                            sectionIsActive =
+                                isSectionActive activeSectionId sectionId
+                        in
+                        tagMenuGeneratingFn tags sectionId
+                            |> makeMenuEntryData GalleryWithTags sectionIsActive sectionId label (SectionRoute sectionId)
+
+                    GallerySectionType { sectionId, label } ->
+                        MenuSectionData Gallery sectionId label False [] NoOp ""
+            )
 
 
 generateMenuEntryAttributes : Bool -> Route -> { sectionIsActive : Bool, onClickMessage : Msg, urlString : String }
@@ -575,19 +615,19 @@ routeToPage route appData =
                 |> InfoPage
 
         SectionRoute activeSectionId ->
-            GalleryPageData (makeSectionMenuData activeSectionId appData) (makeSectionContentData activeSectionId appData)
+            GalleryPageData (makeSectionMenuData activeSectionId appData) (makeSectionContentData activeSectionId appData Nothing)
                 |> GalleryPage
 
         TagRoute activeSectionId activeTagId ->
-            GalleryPageData (makeTagMenuData activeSectionId activeTagId appData) (makeTagContentData activeSectionId activeTagId appData)
+            GalleryPageData (makeTagMenuData activeSectionId activeTagId appData) (makeTagContentData activeSectionId activeTagId appData Nothing)
                 |> GalleryPage
 
         SectionImageRoute activeSectionId imageId ->
-            GalleryPageData (makeSectionMenuData activeSectionId appData) (makeSectionContentData activeSectionId appData)
+            GalleryPageData (makeSectionMenuData activeSectionId appData) (makeSectionContentData activeSectionId appData (Just imageId))
                 |> GalleryPage
 
         TagImageRoute activeSectionId activeTagId imageId ->
-            GalleryPageData (makeTagMenuData activeSectionId activeTagId appData) (makeTagContentData activeSectionId activeTagId appData)
+            GalleryPageData (makeTagMenuData activeSectionId activeTagId appData) (makeTagContentData activeSectionId activeTagId appData (Just imageId))
                 |> GalleryPage
 
 
@@ -604,16 +644,29 @@ findSection sectionList sectionId =
         sectionList
 
 
-makeSectionContentData activeSectionId appData =
+
+--firstImage appData =
+
+
+makeSectionContentData activeSectionId appData maybeActiveItemId =
     case findSection appData activeSectionId of
         Just section ->
             case section of
                 GalleryWithTagsSectionType { items } ->
                     let
                         itemList =
-                            List.map
-                                (\{ itemId, width, height } ->
-                                    ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| SectionImageRoute activeSectionId itemId) width height
+                            List.indexedMap
+                                (\i { itemId, width, height } ->
+                                    case maybeActiveItemId of
+                                        Just activeItemId ->
+                                            ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| SectionImageRoute activeSectionId itemId) width height (activeItemId == itemId)
+
+                                        Nothing ->
+                                            if i == 0 then
+                                                ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| SectionImageRoute activeSectionId itemId) width height True
+
+                                            else
+                                                ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| SectionImageRoute activeSectionId itemId) width height False
                                 )
                                 items
                     in
@@ -626,7 +679,7 @@ makeSectionContentData activeSectionId appData =
             { items = [] }
 
 
-makeTagContentData activeSectionId activeTagId appData =
+makeTagContentData activeSectionId activeTagId appData maybeActiveItemId =
     case findSection appData activeSectionId of
         Just section ->
             case section of
@@ -639,9 +692,18 @@ makeTagContentData activeSectionId activeTagId appData =
                         Just { items } ->
                             let
                                 itemList =
-                                    List.map
-                                        (\{ itemId, width, height } ->
-                                            ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| TagImageRoute activeSectionId activeTagId itemId) width height
+                                    List.indexedMap
+                                        (\i { itemId, width, height } ->
+                                            case maybeActiveItemId of
+                                                Just activeItemId ->
+                                                    ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| TagImageRoute activeSectionId activeTagId itemId) width height (activeItemId == itemId)
+
+                                                Nothing ->
+                                                    if i == 0 then
+                                                        ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| TagImageRoute activeSectionId activeTagId itemId) width height True
+
+                                                    else
+                                                        ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| TagImageRoute activeSectionId activeTagId itemId) width height False
                                         )
                                         items
                             in
@@ -810,3 +872,8 @@ routeParser data =
 
 parseToRoute url data =
     Maybe.withDefault Root (parse (routeParser data) url)
+
+
+relativePos : Pointer.Event -> ( Float, Float )
+relativePos event =
+    event.pointer.offsetPos
