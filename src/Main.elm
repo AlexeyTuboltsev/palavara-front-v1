@@ -2,7 +2,7 @@ module Main exposing (..)
 
 import AppData exposing (..)
 import Browser
-import Browser.Dom exposing (Viewport, getViewport)
+import Browser.Dom exposing (Viewport, getElement, getViewport, getViewportOf)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation
 import Debug
@@ -13,7 +13,7 @@ import Html.Events.Extra exposing (onClickPreventDefault)
 import Html.Events.Extra.Pointer as Pointer
 import Http exposing (expectJson, get)
 import Icons
-import List.Extra exposing (find)
+import List.Extra exposing (find, findIndex, indexedFoldl)
 import Result exposing (Result)
 import Task
 import Url exposing (Url)
@@ -77,7 +77,7 @@ type alias ItemContentData =
 
 
 type alias ContentData =
-    { items : List ItemContentData }
+    { items : List ItemContentData, activeItemIndex : Int }
 
 
 type StartPageData
@@ -140,6 +140,7 @@ type Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | SetRoute Route
+    | SetRoutePageData Route String (Result Browser.Dom.Error ( Viewport, Browser.Dom.Element ))
     | DownMsg ( Float, Float )
     | MoveMsg ( Float, Float )
     | UpMsg ( Float, Float )
@@ -191,7 +192,22 @@ update message model =
                         newUrl =
                             routeToUrlPath route
                     in
-                    ( ReadyModel { readyModelData | route = route, page = routeToPage route readyModelData.data }, Navigation.pushUrl readyModelData.key newUrl )
+                    ( model
+                    , Cmd.batch
+                        [ Task.attempt (SetRoutePageData route newUrl) (Task.map2 (\x y -> ( x, y )) (getViewportOf "slider-window") (getElement "27.jpg"))
+                        ]
+                    )
+
+                SetRoutePageData route newUrl r ->
+                    let
+                        _ =
+                            Debug.log "bla" r
+                    in
+                    ( ReadyModel { readyModelData | route = route, page = routeToPage route readyModelData.data }
+                    , Cmd.batch
+                        [ Navigation.pushUrl readyModelData.key newUrl
+                        ]
+                    )
 
                 UrlChanged url ->
                     if url.path == routeToUrlPath readyModelData.route then
@@ -351,12 +367,13 @@ initialOffset =
 
 
 pictureHeight =
-    150
+    609.96
 
 
 buildPictures contentData =
     div
         [ class "slider-window"
+        , id "slider-window"
         , Pointer.onDown (relativePos >> DownMsg)
         , Pointer.onMove (relativePos >> MoveMsg)
         , Pointer.onUp (relativePos >> UpMsg)
@@ -364,7 +381,7 @@ buildPictures contentData =
         ]
         [ div
             [ class "image-group"
-            , style "top" (String.fromFloat (initialOffset + pictureHeight * 0) ++ "px")
+            , style "top" (String.fromFloat (-1 * (pictureHeight * toFloat contentData.activeItemIndex - initialOffset)) ++ "px")
 
             --, onMouseOver FadeInPictures
             --, onMouseOut FadeOutPictures
@@ -376,6 +393,7 @@ buildPictures contentData =
                         itemData.urlString
                         itemData.onClickMessage
                         itemData.isActive
+                        itemData.itemId
                 )
              <|
                 contentData.items
@@ -383,9 +401,10 @@ buildPictures contentData =
         ]
 
 
-buildSectionPicture urlString onClickMessage isActive =
+buildSectionPicture urlString onClickMessage isActive itemId =
     a
-        [ class
+        [ id itemId
+        , class
             (if isActive then
                 "image active-image"
 
@@ -615,19 +634,27 @@ routeToPage route appData =
                 |> InfoPage
 
         SectionRoute activeSectionId ->
-            GalleryPageData (makeSectionMenuData activeSectionId appData) (makeSectionContentData activeSectionId appData Nothing)
+            GalleryPageData
+                (makeSectionMenuData activeSectionId appData)
+                (makeSectionContentData activeSectionId appData zeroItemIndex (SectionImageRoute activeSectionId))
                 |> GalleryPage
 
         TagRoute activeSectionId activeTagId ->
-            GalleryPageData (makeTagMenuData activeSectionId activeTagId appData) (makeTagContentData activeSectionId activeTagId appData Nothing)
+            GalleryPageData
+                (makeTagMenuData activeSectionId activeTagId appData)
+                (makeTagContentData activeSectionId activeTagId appData zeroItemIndex (TagImageRoute activeSectionId activeTagId))
                 |> GalleryPage
 
         SectionImageRoute activeSectionId imageId ->
-            GalleryPageData (makeSectionMenuData activeSectionId appData) (makeSectionContentData activeSectionId appData (Just imageId))
+            GalleryPageData
+                (makeSectionMenuData activeSectionId appData)
+                (makeSectionContentData activeSectionId appData (findItemIndex imageId) (SectionImageRoute activeSectionId))
                 |> GalleryPage
 
         TagImageRoute activeSectionId activeTagId imageId ->
-            GalleryPageData (makeTagMenuData activeSectionId activeTagId appData) (makeTagContentData activeSectionId activeTagId appData (Just imageId))
+            GalleryPageData
+                (makeTagMenuData activeSectionId activeTagId appData)
+                (makeTagContentData activeSectionId activeTagId appData (findItemIndex imageId) (TagImageRoute activeSectionId activeTagId))
                 |> GalleryPage
 
 
@@ -644,79 +671,80 @@ findSection sectionList sectionId =
         sectionList
 
 
+findTag tagId section =
+    case section of
+        GalleryWithTagsSectionType { tags } ->
+            find (\tag -> tag.tagId == tagId) tags
 
---firstImage appData =
-
-
-makeSectionContentData activeSectionId appData maybeActiveItemId =
-    case findSection appData activeSectionId of
-        Just section ->
-            case section of
-                GalleryWithTagsSectionType { items } ->
-                    let
-                        itemList =
-                            List.indexedMap
-                                (\i { itemId, width, height } ->
-                                    case maybeActiveItemId of
-                                        Just activeItemId ->
-                                            ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| SectionImageRoute activeSectionId itemId) width height (activeItemId == itemId)
-
-                                        Nothing ->
-                                            if i == 0 then
-                                                ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| SectionImageRoute activeSectionId itemId) width height True
-
-                                            else
-                                                ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| SectionImageRoute activeSectionId itemId) width height False
-                                )
-                                items
-                    in
-                    { items = itemList }
-
-                _ ->
-                    { items = [] }
-
-        Nothing ->
-            { items = [] }
+        _ ->
+            Nothing
 
 
-makeTagContentData activeSectionId activeTagId appData maybeActiveItemId =
-    case findSection appData activeSectionId of
-        Just section ->
-            case section of
-                GalleryWithTagsSectionType { tags } ->
-                    let
-                        maybeTagData =
-                            find (\tag -> tag.tagId == activeTagId) tags
-                    in
-                    case maybeTagData of
-                        Just { items } ->
-                            let
-                                itemList =
-                                    List.indexedMap
-                                        (\i { itemId, width, height } ->
-                                            case maybeActiveItemId of
-                                                Just activeItemId ->
-                                                    ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| TagImageRoute activeSectionId activeTagId itemId) width height (activeItemId == itemId)
+findGalleryWithTagsSectionType section =
+    case section of
+        GalleryWithTagsSectionType data ->
+            Just data
 
-                                                Nothing ->
-                                                    if i == 0 then
-                                                        ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| TagImageRoute activeSectionId activeTagId itemId) width height True
+        _ ->
+            Nothing
 
-                                                    else
-                                                        ItemContentData itemId ("/img/" ++ itemId) (SetRoute <| TagImageRoute activeSectionId activeTagId itemId) width height False
-                                        )
-                                        items
-                            in
-                            { items = itemList }
 
-                        Nothing ->
-                            { items = [] }
+makeItemContentDataInternal activeItemIndex onClickMessage =
+    \i { itemId, width, height } acc ->
+        { acc
+            | items =
+                List.append
+                    acc.items
+                    [ ItemContentData
+                        itemId
+                        ("/img/" ++ itemId)
+                        (onClickMessage itemId)
+                        width
+                        height
+                        (activeItemIndex == i)
+                    ]
+            , activeItemIndex = activeItemIndex
+        }
 
-                _ ->
-                    { items = [] }
 
-        Nothing ->
-            { items = [] }
+makeItemContentData nextRoute itemIndexFn items =
+    (\is -> itemIndexFn is) items
+        |> Maybe.map
+            (\activeItemIndex ->
+                let
+                    onClickMessage =
+                        \itemId -> SetRoute <| nextRoute itemId
+                in
+                indexedFoldl
+                    (makeItemContentDataInternal activeItemIndex onClickMessage)
+                    { items = [], activeItemIndex = 0 }
+                    items
+            )
+
+
+findItemIndex activeItemId items =
+    findIndex (\x -> x.itemId == activeItemId) items
+
+
+zeroItemIndex _ =
+    Just 0
+
+
+makeContentDataInternal activeSectionId sectionFn itemsFn appData =
+    findSection appData activeSectionId
+        |> Maybe.andThen
+            (\section -> sectionFn section)
+        |> Maybe.andThen
+            (\{ items } -> itemsFn items)
+        |> Maybe.withDefault { items = [], activeItemIndex = 0 }
+
+
+makeSectionContentData activeSectionId appData itemIndexFn nextRoute =
+    makeContentDataInternal activeSectionId findGalleryWithTagsSectionType (makeItemContentData nextRoute itemIndexFn) appData
+
+
+makeTagContentData activeSectionId activeTagId appData itemIndexFn nextRoute =
+    makeContentDataInternal activeSectionId (findTag activeTagId) (makeItemContentData nextRoute itemIndexFn) appData
 
 
 isSectionActive sectionId activeSectionId =

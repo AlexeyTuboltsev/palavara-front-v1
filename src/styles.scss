@@ -2,13 +2,17 @@ $top-bar-height: 4.1rem;
 $screen-height: 100vh;
 
 $line-height: 144%;
-$image-height: calc((100vh - #{$top-bar-height}) * 0.7);
+//$image-height: calc((100vh - #{$top-bar-height}) * 0.7);
 
 $color-canvas: #ffffff;
 $color-light-gray: #cccccc;
 $color-gray: #a5a5a5;
 $color-black: #000000;
 $color-blue: #000045;
+
+:root {
+  --image-height:calc((100vh - #{$top-bar-height}) * 0.7);
+}
 
 @font-face {
   font-family: 'Brutal Type';
@@ -513,8 +517,8 @@ body {
   flex: 1 0 100%;
   width: 100%;
   display: grid;
-  grid-template: $image-height/100%;
-  grid-auto-rows: $image-height;
+  grid-template: var(--image-height)/100%;
+  grid-auto-rows: var(--image-height);
   grid-auto-flow: row;
   grid-row-gap: 2rem;
   align-items: center;
@@ -551,6 +555,7 @@ body {
 
   & img {
     width: 100%;
+    max-height: 100%;
     object-fit: contain;
     margin-top: auto;
     margin-bottom: 0;
