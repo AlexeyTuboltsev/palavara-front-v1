@@ -22,7 +22,7 @@ import Url.Parser as UrlParser exposing ((</>), Parser, custom, int, oneOf, pars
 
 
 mobileBreakpoint =
-    555
+    1024
 
 
 type alias Flags =
@@ -121,6 +121,7 @@ type alias InProgressModelData =
     { key : Navigation.Key
     , route : Route
     , data : AppData
+    , viewport : Viewport
     }
 
 
@@ -159,18 +160,46 @@ type Msg
 -- UPDATE --
 
 
-check model =
-    case model of
-        InitModel initModelData ->
-            Maybe.map2
-                (\x y ->
-                    True
+allFieldsPresent newModel =
+    case newModel of
+        InitModel d ->
+            Maybe.map4
+                (\appData vp key url ->
+                    let
+                        route =
+                            parseToRoute url appData
+                    in
+                    ( route, InitProgressModel { data = appData, viewport = vp, key = key, route = route } )
                 )
-                initModelData.viewport
-                initModelData.data
+                d.data
+                d.viewport
+                (Just d.key)
+                (Just d.url)
 
         _ ->
-            Just False
+            Nothing
+
+
+setRoute modelData route =
+    if modelData.viewport.viewport.width <= mobileBreakpoint then
+        case route of
+            SectionRoute _ ->
+                mobileSetRoute modelData route
+
+            SectionImageRoute _ _ ->
+                mobileSetRoute modelData route
+
+            TagRoute _ _ ->
+                mobileSetRoute modelData route
+
+            TagImageRoute _ _ _ ->
+                mobileSetRoute modelData route
+
+            _ ->
+                ( ReadyModel { modelData | route = route, page = routeToPage route modelData.data }, Navigation.pushUrl modelData.key <| routeToUrlPath route )
+
+    else
+        ( ReadyModel { modelData | route = route, page = routeToPage route modelData.data }, Navigation.pushUrl modelData.key <| routeToUrlPath route )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -188,9 +217,9 @@ update message model =
                                 newModel =
                                     InitModel { initModel | data = Just data }
                             in
-                            case check newModel of
-                                Just True ->
-                                    ( newModel, Cmd.none )
+                            case allFieldsPresent newModel of
+                                Just ( route, initProgressModel ) ->
+                                    update (SetInitialRoute route) initProgressModel
 
                                 Nothing ->
                                     ( newModel, Cmd.none )
@@ -200,18 +229,29 @@ update message model =
                         newModel =
                             InitModel { initModel | viewport = Just viewport }
                     in
-                    ( newModel, Cmd.none )
+                    case allFieldsPresent newModel of
+                        Just ( route, initProgressModel ) ->
+                            update (SetInitialRoute route) initProgressModel
+
+                        Nothing ->
+                            ( newModel, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
-        InitProgressModel { key, route, data } ->
+        InitProgressModel initProgressModel ->
             case message of
-                SetViewport viewport ->
-                    ( ReadyModel { viewport = viewport, key = key, route = route, page = routeToPage route data, data = data }, Cmd.none )
-
-                AppIsReady data ->
-                    ( ReadyModel { viewport = viewport, key = key, route = route, page = routeToPage route data, data = data }, Cmd.none )
+                SetInitialRoute route ->
+                    let
+                        newModelData =
+                            { viewport = initProgressModel.viewport
+                            , key = initProgressModel.key
+                            , route = route
+                            , page = routeToPage route initProgressModel.data
+                            , data = initProgressModel.data
+                            }
+                    in
+                    setRoute newModelData route
 
                 _ ->
                     ( model, Cmd.none )
@@ -230,25 +270,7 @@ update message model =
                     ( ReadyModel { readyModelData | viewport = viewport }, Cmd.none )
 
                 SetRoute route ->
-                    if readyModelData.viewport.viewport.width <= mobileBreakpoint then
-                        case route of
-                            SectionRoute _ ->
-                                mobileSetRoute readyModelData route
-
-                            SectionImageRoute _ _ ->
-                                mobileSetRoute readyModelData route
-
-                            TagRoute _ _ ->
-                                mobileSetRoute readyModelData route
-
-                            TagImageRoute _ _ _ ->
-                                mobileSetRoute readyModelData route
-
-                            _ ->
-                                ( ReadyModel { readyModelData | route = route, page = routeToPage route readyModelData.data }, Navigation.pushUrl readyModelData.key <| routeToUrlPath route )
-
-                    else
-                        ( ReadyModel { readyModelData | route = route, page = routeToPage route readyModelData.data }, Navigation.pushUrl readyModelData.key <| routeToUrlPath route )
+                    setRoute readyModelData route
 
                 SetSectionRouteWithPageDimensions route dimensions ->
                     case dimensions of
@@ -317,26 +339,6 @@ main =
         , onUrlRequest = LinkClicked
         , onUrlChange = UrlChanged
         }
-
-
-initProgress url key data =
-    let
-        route =
-            parseToRoute url data
-
-        newUrl =
-            routeToUrlPath route
-    in
-    ( InitProgressModel
-        { key = key
-        , route = route
-        , data = data
-        }
-    , Cmd.batch
-        [ Navigation.replaceUrl key newUrl
-        , Task.perform AppIsReady <| Task.succeed data
-        ]
-    )
 
 
 init : Flags -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
