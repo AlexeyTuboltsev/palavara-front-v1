@@ -11,7 +11,7 @@ $color-black: #000000;
 $color-blue: #000045;
 
 :root {
-  --image-height:calc((100vh - #{$top-bar-height}) * 0.7);
+  --image-height: calc((100vh - #{$top-bar-height}) * 0.7);
 }
 
 @font-face {
@@ -159,15 +159,38 @@ body {
   }
 }
 
-.layout {
+.start {
   display: flex;
   flex-flow: column nowrap;
+  height: 100vh;
 
   @media screen and (max-height: 375px) and (orientation: landscape) {
     margin-top: 0;
   }
 
-  @media screen and (min-width: 1024px){
+  @media screen and (min-width: 1024px) {
+    width: 100%;
+    display: grid;
+    grid-template: auto 1fr / 1fr;
+  }
+
+  @media screen and (min-width: 1366px) {
+    width: 100%;
+    display: grid;
+    grid-template: 1fr /43rem 1fr;
+  }
+}
+
+.layout {
+  display: flex;
+  flex-flow: column nowrap;
+  height: 100vh;
+
+  @media screen and (max-height: 375px) and (orientation: landscape) {
+    margin-top: 0;
+  }
+
+  @media screen and (min-width: 1024px) {
     width: 100%;
     display: grid;
     grid-template: auto 1fr / 1fr;
@@ -220,6 +243,7 @@ body {
     border-radius: calc(#{$size} / 2);
     padding: $padding;
     cursor: pointer;
+
     svg {
       height: 100%;
       fill: $color-blue;
@@ -258,37 +282,15 @@ body {
       font-weight: 500;
       line-height: 100%;
       color: $color-gray;
+
       &:active {
         color: $color-blue;
       }
+
       &.active {
         color: $color-canvas;
       }
     }
-  }
-
-
-  @media screen and (min-width: 1024px) {
-    position: initial;
-    top: initial;
-    left: initial;
-    z-index: initial;
-    grid-column: 1;
-    grid-row: 1;
-
-    grid-template: 1fr auto/1fr repeat(3, 18.5%);
-    height: auto;
-    align-items: start;
-    justify-items: start;
-    padding: 5.2rem 2.7rem;
-    align-self: start;
-
-    background-color: #ffffff;
-  }
-
-  @media screen and (min-width: 1366px) {
-    grid-template: 1fr / auto;
-    grid-auto-rows: auto;
   }
 }
 
@@ -373,37 +375,42 @@ body {
     margin: 0;
     justify-self: right;
     align-self: end;
+
     .menu-entry-label {
       font-size: 1.5rem;
       font-weight: 500;
       line-height: 100%;
       color: $color-gray;
+
       &:active {
         color: $color-blue;
       }
+
       &.active {
         color: $color-canvas;
       }
     }
   }
+}
 
+.start .menu,
+.layout .menu {
   @media screen and (min-width: 1024px) {
     position: initial;
     top: initial;
     left: initial;
     z-index: initial;
-    background-color: #ffffff;
     grid-column: 1;
     grid-row: 1;
-    display: grid;
+
     grid-template: 1fr auto/1fr repeat(3, 18.5%);
-    width: 100%;
     height: auto;
     align-items: start;
     justify-items: start;
-    margin: 0;
     padding: 5.2rem 2.7rem;
     align-self: start;
+    margin: 0;
+    background-color: #ffffff;
 
     .logo {
       grid-column: 1;
@@ -414,6 +421,7 @@ body {
       padding: 0;
       align-self: flex-start;
     }
+
     .logo-label {
       color: #000045;
       font-size: 2.4rem;
@@ -428,8 +436,113 @@ body {
       font-weight: 500;
       color: #000045;
       margin: 0;
+      line-height: 30%;
+    }
+    .logo-image {
+      order: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 11.6rem;
+      height: 11.6rem;
+      margin: 0;
+      border: 1px solid transparent;
+      padding: 0;
     }
 
+    .menu-entry {
+      grid-row: 1 /span 2;
+      grid-column: initial;
+      display: flex;
+      flex-flow: column;
+      width: 100%;
+    }
+
+    .menu-entry:last-of-type {
+      grid-row: 1 /span 1;
+    }
+
+    .menu-entry-label {
+      align-self: flex-start;
+      color: #000045;
+      font-size: 1.7rem;
+      font-weight: bold;
+      line-height: 144%;
+      margin: 0 0 0.7rem 0;
+    }
+
+    .menu-entry-label:before {
+      display: inline-block;
+      content: ' ';
+      background-image: url("../public/img/pipe.svg");
+      background-repeat: no-repeat;
+      background-size: 3px 42px;
+      height: 48px;
+      width: 28px;
+      vertical-align: middle;
+    }
+
+    .menu-entry-groups {
+      align-self: flex-start;
+      display: flex;
+      flex-flow: column nowrap;
+      width: calc(100% - 3.4rem);
+      margin-left: 3.4rem;
+      padding-left: 2rem;
+    }
+
+    .menu-entry-groups a {
+      align-self: flex-start;
+      display: block;
+      font-weight: normal;
+      font-size: 1.6rem;
+      color: #a5a5a5;
+      line-height: 100%;
+      margin: 0.85rem 0 0 0;
+    }
+
+    .menu-entry-groups a:hover:before {
+      content: "— ";
+    }
+
+    .menu-entry-groups a.active {
+      color: #000045;
+      text-transform: uppercase;
+      font-weight: bold;
+      margin-left: -2rem;
+    }
+
+    .menu-entry-groups a.active:before {
+      content: "\2014\00a0";
+      color: #a5a5a5;
+    }
+
+    .pipe {
+      display: none;
+    }
+
+    .menu-entry.info {
+      grid-column: initial;
+      grid-row: 2;
+      justify-self: left;
+      align-self: end;
+      margin: 2rem 0 0 0;
+      padding: 0;
+    }
+
+    .menu-entry.info .menu-entry-label {
+      font-size: 1.7rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      margin: 0;
+      line-height: 80%;
+      padding: 0;
+      color: #000045;
+    }
+
+    .menu-entry.info .menu-entry-label:before {
+      background: none;
+    }
   }
 
   @media screen and (min-width: 1366px) {
@@ -449,6 +562,7 @@ body {
     padding: 5.2rem 2.7rem;
     align-self: start;
 
+
     .logo {
       grid-column: 1;
       grid-row: 1;
@@ -458,7 +572,6 @@ body {
       padding: 0;
       align-self: flex-start;
     }
-
     .logo-label {
       color: #000045;
       font-size: 3rem;
@@ -467,7 +580,6 @@ body {
       order: 2;
       align-self: center;
     }
-
     .logo-label-byline {
       display: block;
       font-size: 2rem;
@@ -475,6 +587,83 @@ body {
       color: #000045;
       margin: 0;
       line-height: 30%;
+    }
+    .logo-image {
+      order: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 11.6rem;
+      height: 11.6rem;
+      margin: 0;
+      border: 1px solid transparent;
+      padding: 0;
+    }
+
+    .menu-entry {
+      grid-row: initial;
+      grid-column: 1;
+      display: flex;
+      flex-flow: column;
+      width: 100%;
+      padding-left: 2rem;
+    }
+
+    .menu-entry-label {
+      align-self: flex-start;
+      color: #000045;
+      font-size: 2.1rem;
+      font-weight: bold;
+      line-height: 144%;
+      margin: 0.7rem 0;
+    }
+
+    .menu-entry-label:before {
+      display: none;
+    }
+
+    .menu-entry-groups {
+      align-self: flex-start;
+      display: flex;
+      flex-flow: column nowrap;
+      width: calc(100% - 5rem);
+      margin-left: 5rem;
+    }
+    .menu-entry-groups a {
+      align-self: flex-start;
+      display: block;
+      font-weight: normal;
+      font-size: 2rem;
+      color: #a5a5a5;
+      line-height: 144%;
+    }
+    .menu-entry-groups a:hover:before {
+      content: "— ";
+    }
+    .menu-entry-groups a.active {
+      color: #000045;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+    .menu-entry-groups a.active:before {
+      content: "\2014\00a0";
+      color: #a5a5a5;
+    }
+
+    .pipe {
+      display: none;
+    }
+
+    .menu-entry.info {
+      grid-column: 1;
+      grid-row: 5;
+      justify-self: left;
+      margin: 2rem 0 0 2rem;
+    }
+    .menu-entry.info .menu-entry-label {
+      font-size: 2.1rem;
+      font-weight: normal;
+      text-transform: uppercase;
     }
   }
 }
@@ -512,33 +701,6 @@ body {
 
 }
 
-.image-group {
-  position: relative;
-  flex: 1 0 100%;
-  width: 100%;
-  display: grid;
-  grid-template: var(--image-height)/100%;
-  grid-auto-rows: var(--image-height);
-  grid-auto-flow: row;
-  grid-row-gap: 2rem;
-  align-items: center;
-  justify-items: center;
-  transition: top 1s ease 0s;
-
-  @media screen and (min-width: 1366px) {
-    grid-row: 2;
-    position: initial;
-    width: 100%;
-    display: grid;
-    grid-template: 25rem / repeat(5, 1fr);
-    grid-auto-flow: row;
-    grid-column-gap: 3rem;
-    grid-row-gap: 8rem;
-    align-items: center;
-    justify-items: center;
-  }
-}
-
 .image {
   display: flex;
   width: 100%;
@@ -548,10 +710,10 @@ body {
   padding: 0 1rem;
 
   background-color: $color-canvas;
-  cursor:pointer;
+  cursor: pointer;
 
   transition-property: min-height;
-  transition-duration: 2s;
+  transition-duration: 1s;
 
   & img {
     width: 100%;
@@ -584,10 +746,11 @@ body {
   }
 
   &.fadeout {
-    @media screen and (min-width: 1366px){
-    opacity: 1;
-    animation: none;
-  }}
+    @media screen and (min-width: 1366px) {
+      opacity: 1;
+      animation: none;
+    }
+  }
 
   &.fadein {
     @media screen and (min-width: 1366px) {
@@ -599,33 +762,9 @@ body {
   &.active-image {
     min-height: 1rem;
 
-  //
-  //
-  //  @media screen and (min-width: 1366px) {
-  //    height: 0;
-  //    width: 100%;
-  //    display: grid;
-  //    grid-template: 100% / 5rem 1fr 5rem;
-  //    grid-column-gap: 2rem;
-  //    align-items: center;
-  //    justify-items: center;
-  //    padding: 2rem;
-  //    animation-delay: 0s;
-  //    animation-duration: 0.1s;
-  //    animation-name: open-active-image;
-  //    animation-fill-mode: forwards;
-  //  }
-  //
     &.active-image img {
       margin-top: 0;
       margin-bottom: 0;
-      //@media screen and (min-width: 1366px) {
-      //  grid-column: 2;
-      //  width: 100%;
-      //  height: 100%;
-      //  max-height: 60vh;
-      //  object-fit: contain;
-      //}
     }
 
   }
@@ -652,6 +791,58 @@ body {
         cursor: pointer;
       }
     }
+  }
+}
+
+.image-group {
+  position: relative;
+  flex: 1 0 100%;
+  width: 100%;
+  display: grid;
+  grid-template: var(--image-height)/100%;
+  grid-auto-rows: var(--image-height);
+  grid-auto-flow: row;
+  grid-row-gap: 2rem;
+  align-items: center;
+  justify-items: center;
+  transition: top 1s ease 0s;
+
+  .image {
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 1s;
+  }
+
+  .image.active-image {
+    opacity: 1;
+  }
+
+  &:active,
+  &:hover {
+    .image {
+      opacity: 1;
+    }
+  }
+
+  @media screen and (min-width: 1024px) {
+    grid-row: 2;
+    position: initial;
+    width: 100%;
+    display: grid;
+    grid-template: 25rem / repeat(5, 1fr);
+    grid-auto-flow: row;
+    grid-column-gap: 3rem;
+    grid-row-gap: 8rem;
+    align-items: center;
+    justify-items: center;
+    .image {
+      opacity: 1;
+      transition: none;
+    }
+  }
+
+  @media screen and (min-width: 1366px) {
+
   }
 }
 

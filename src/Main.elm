@@ -80,9 +80,17 @@ type alias ItemContentData =
     }
 
 
+type alias MobileContentDataType =
+    { items : List ItemContentData, activeItemIndex : Int, sliderHeight : Float }
+
+
+type alias ContentDataType =
+    { items : List ItemContentData, activeItemIndex : Int }
+
+
 type ContentData
-    = MobileContentData { items : List ItemContentData, activeItemIndex : Int, sliderHeight : Float }
-    | ContentData { items : List ItemContentData, activeItemIndex : Int }
+    = MobileContentData MobileContentDataType
+    | ContentData ContentDataType
 
 
 type StartPageData
@@ -157,6 +165,8 @@ type Msg
 
 
 
+--| FadeInPictures
+--| FadeOutPictures
 -- UPDATE --
 
 
@@ -648,6 +658,7 @@ routeToUrlPath route =
             absolute [ sectionId, tagId, imageId ] []
 
 
+makeRootMenuData : SectionData -> MenuSectionData
 makeRootMenuData section =
     case section of
         GalleryWithTagsSectionType { sectionId, label, tags } ->
@@ -660,6 +671,7 @@ makeRootMenuData section =
             makeMenuEntryData Info False sectionId label InfoRoute []
 
 
+makeInfoMenuData : SectionData -> MenuSectionData
 makeInfoMenuData section =
     case section of
         GalleryWithTagsSectionType { sectionId, label, tags } ->
@@ -672,15 +684,29 @@ makeInfoMenuData section =
             makeMenuEntryData Info True sectionId label InfoRoute []
 
 
+makeSectionMenuData : SectionId -> List SectionData -> MenuData
 makeSectionMenuData activeSectionId sections =
     makeSectionMenuDataInternal activeSectionId sections makeMenuTagData
 
 
+makeTagMenuData : SectionId -> TagId -> List SectionData -> MenuData
 makeTagMenuData activeSectionId activeTagId sections =
     makeMenuTagDataWithActiveTag activeTagId
         |> makeSectionMenuDataInternal activeSectionId sections
 
 
+makeMobileSectionMenuData : SectionId -> List SectionData -> MenuData
+makeMobileSectionMenuData activeSectionId sections =
+    makeSectionMenuDataInternal activeSectionId (filterMenuInfoSection sections) makeMenuTagData
+
+
+makeMobileTagMenuData : SectionId -> TagId -> List SectionData -> MenuData
+makeMobileTagMenuData activeSectionId activeTagId sections =
+    makeMenuTagDataWithActiveTag activeTagId
+        |> makeSectionMenuDataInternal activeSectionId (filterMenuInfoSection sections)
+
+
+filterMenuInfoSection : List SectionData -> List SectionData
 filterMenuInfoSection sections =
     List.filter
         (\section ->
@@ -694,25 +720,26 @@ filterMenuInfoSection sections =
         sections
 
 
+makeSectionMenuDataInternal : SectionId -> List SectionData -> (List TagData -> SectionId -> List MenuTagData) -> MenuData
 makeSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
-    filterMenuInfoSection sections
-        |> List.map
-            (\section ->
-                case section of
-                    InfoSectionType { sectionId, label } ->
-                        makeMenuEntryData Info False sectionId label InfoRoute []
+    List.map
+        (\section ->
+            case section of
+                InfoSectionType { sectionId, label } ->
+                    makeMenuEntryData Info False sectionId label InfoRoute []
 
-                    GalleryWithTagsSectionType { sectionId, label, tags } ->
-                        let
-                            sectionIsActive =
-                                isSectionActive activeSectionId sectionId
-                        in
-                        tagMenuGeneratingFn tags sectionId
-                            |> makeMenuEntryData GalleryWithTags sectionIsActive sectionId label (SectionRoute sectionId)
+                GalleryWithTagsSectionType { sectionId, label, tags } ->
+                    let
+                        sectionIsActive =
+                            isSectionActive activeSectionId sectionId
+                    in
+                    tagMenuGeneratingFn tags sectionId
+                        |> makeMenuEntryData GalleryWithTags sectionIsActive sectionId label (SectionRoute sectionId)
 
-                    GallerySectionType { sectionId, label } ->
-                        MenuSectionData Gallery sectionId label False [] NoOp ""
-            )
+                GallerySectionType { sectionId, label } ->
+                    MenuSectionData Gallery sectionId label False [] NoOp ""
+        )
+        sections
 
 
 generateMenuEntryAttributes : Bool -> Route -> { sectionIsActive : Bool, onClickMessage : Msg, urlString : String }
@@ -734,79 +761,55 @@ makeMenuEntryData menuSectionType sectionIsActive sectionId label nextRoute tagM
     MenuSectionData menuSectionType sectionId label menuEntryAttributes.sectionIsActive tagMenuData menuEntryAttributes.onClickMessage menuEntryAttributes.urlString
 
 
+
+--routeToPageInternal : (SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData) -> (SectionId -> TagId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData) -> Route -> AppData -> Page
+
+
+routeToPageInternal sectionMenuFn tagMenuFn sectionFn tagFn route appData =
+    case route of
+        Root ->
+            List.map makeRootMenuData appData
+                |> StartPageData
+                |> StartPage
+
+        InfoRoute ->
+            List.map makeInfoMenuData appData
+                |> InfoPageData
+                |> InfoPage
+
+        SectionRoute activeSectionId ->
+            GalleryPageData
+                (sectionMenuFn activeSectionId appData)
+                (sectionFn activeSectionId appData zeroItemIndex (SectionImageRoute activeSectionId))
+                |> GalleryPage
+
+        TagRoute activeSectionId activeTagId ->
+            GalleryPageData
+                (tagMenuFn activeSectionId activeTagId appData)
+                (tagFn activeSectionId activeTagId appData zeroItemIndex (TagImageRoute activeSectionId activeTagId))
+                |> GalleryPage
+
+        SectionImageRoute activeSectionId imageId ->
+            GalleryPageData
+                (sectionMenuFn activeSectionId appData)
+                (sectionFn activeSectionId appData (findItemIndex imageId) (SectionImageRoute activeSectionId))
+                |> GalleryPage
+
+        TagImageRoute activeSectionId activeTagId imageId ->
+            GalleryPageData
+                (tagMenuFn activeSectionId activeTagId appData)
+                (tagFn activeSectionId activeTagId appData (findItemIndex imageId) (TagImageRoute activeSectionId activeTagId))
+                |> GalleryPage
+
+
 routeToPage : Route -> AppData -> Page
 routeToPage route appData =
-    case route of
-        Root ->
-            List.map makeRootMenuData appData
-                |> StartPageData
-                |> StartPage
-
-        InfoRoute ->
-            List.map makeInfoMenuData appData
-                |> InfoPageData
-                |> InfoPage
-
-        SectionRoute activeSectionId ->
-            GalleryPageData
-                (makeSectionMenuData activeSectionId appData)
-                (makeSectionContentData activeSectionId appData zeroItemIndex (SectionImageRoute activeSectionId))
-                |> GalleryPage
-
-        TagRoute activeSectionId activeTagId ->
-            GalleryPageData
-                (makeTagMenuData activeSectionId activeTagId appData)
-                (makeTagContentData activeSectionId activeTagId appData zeroItemIndex (TagImageRoute activeSectionId activeTagId))
-                |> GalleryPage
-
-        SectionImageRoute activeSectionId imageId ->
-            GalleryPageData
-                (makeSectionMenuData activeSectionId appData)
-                (makeSectionContentData activeSectionId appData (findItemIndex imageId) (SectionImageRoute activeSectionId))
-                |> GalleryPage
-
-        TagImageRoute activeSectionId activeTagId imageId ->
-            GalleryPageData
-                (makeTagMenuData activeSectionId activeTagId appData)
-                (makeTagContentData activeSectionId activeTagId appData (findItemIndex imageId) (TagImageRoute activeSectionId activeTagId))
-                |> GalleryPage
+    routeToPageInternal makeSectionMenuData makeTagMenuData makeSectionContentData makeTagContentData route appData
 
 
+routeToMobilePage : Route -> Float -> AppData -> Page
 routeToMobilePage route sliderHeight appData =
-    case route of
-        Root ->
-            List.map makeRootMenuData appData
-                |> StartPageData
-                |> StartPage
-
-        InfoRoute ->
-            List.map makeInfoMenuData appData
-                |> InfoPageData
-                |> InfoPage
-
-        SectionRoute activeSectionId ->
-            GalleryPageData
-                (makeSectionMenuData activeSectionId appData)
-                (makeMobileSectionContentData sliderHeight activeSectionId appData zeroItemIndex (SectionImageRoute activeSectionId))
-                |> GalleryPage
-
-        TagRoute activeSectionId activeTagId ->
-            GalleryPageData
-                (makeTagMenuData activeSectionId activeTagId appData)
-                (makeMobileTagContentData sliderHeight activeSectionId activeTagId appData zeroItemIndex (TagImageRoute activeSectionId activeTagId))
-                |> GalleryPage
-
-        SectionImageRoute activeSectionId imageId ->
-            GalleryPageData
-                (makeSectionMenuData activeSectionId appData)
-                (makeMobileSectionContentData sliderHeight activeSectionId appData (findItemIndex imageId) (SectionImageRoute activeSectionId))
-                |> GalleryPage
-
-        TagImageRoute activeSectionId activeTagId imageId ->
-            GalleryPageData
-                (makeTagMenuData activeSectionId activeTagId appData)
-                (makeMobileTagContentData sliderHeight activeSectionId activeTagId appData (findItemIndex imageId) (TagImageRoute activeSectionId activeTagId))
-                |> GalleryPage
+    routeToPageInternal makeMobileSectionMenuData makeMobileTagMenuData (makeMobileSectionContentData sliderHeight) (makeMobileTagContentData sliderHeight) route appData
 
 
 findSection sectionList sectionId =
@@ -822,6 +825,7 @@ findSection sectionList sectionId =
         sectionList
 
 
+findTag : TagId -> SectionData -> Maybe TagData
 findTag tagId section =
     case section of
         GalleryWithTagsSectionType { tags } ->
@@ -831,6 +835,7 @@ findTag tagId section =
             Nothing
 
 
+findGalleryWithTagsSectionType : SectionData -> Maybe GalleryWithTagsSectionData
 findGalleryWithTagsSectionType section =
     case section of
         GalleryWithTagsSectionType data ->
@@ -840,6 +845,7 @@ findGalleryWithTagsSectionType section =
             Nothing
 
 
+makeItemContentDataInternal : Int -> (ItemId -> Msg) -> (Int -> ItemData -> { x | items : List ItemContentData, activeItemIndex : Int } -> { x | items : List ItemContentData, activeItemIndex : Int })
 makeItemContentDataInternal activeItemIndex onClickMessage =
     \i { itemId, width, height } acc ->
         { acc
@@ -858,6 +864,7 @@ makeItemContentDataInternal activeItemIndex onClickMessage =
         }
 
 
+makeItemContentData : (ItemId -> Route) -> (List ItemData -> Maybe Int) -> List ItemData -> Maybe ContentDataType
 makeItemContentData nextRoute itemIndexFn items =
     (\is -> itemIndexFn is) items
         |> Maybe.map
@@ -873,6 +880,7 @@ makeItemContentData nextRoute itemIndexFn items =
             )
 
 
+makeMobileItemContentData : Float -> (ItemId -> Route) -> (List ItemData -> Maybe Int) -> List ItemData -> Maybe MobileContentDataType
 makeMobileItemContentData sliderHeight nextRoute itemIndexFn items =
     (\is -> itemIndexFn is) items
         |> Maybe.map
@@ -888,14 +896,17 @@ makeMobileItemContentData sliderHeight nextRoute itemIndexFn items =
             )
 
 
+findItemIndex : ItemId -> List ItemData -> Maybe Int
 findItemIndex activeItemId items =
     findIndex (\x -> x.itemId == activeItemId) items
 
 
+zeroItemIndex : x -> Maybe Int
 zeroItemIndex _ =
     Just 0
 
 
+getSectionItems : SectionId -> (SectionData -> Maybe { a | items : List ItemData }) -> (List ItemData -> Maybe y) -> AppData -> Maybe y
 getSectionItems activeSectionId sectionFn itemsFn appData =
     findSection appData activeSectionId
         |> Maybe.andThen
@@ -904,46 +915,45 @@ getSectionItems activeSectionId sectionFn itemsFn appData =
             (\{ items } -> itemsFn items)
 
 
-findFirstSectionItem sectionId appData =
-    getSectionItems sectionId findGalleryWithTagsSectionType (\items -> List.head items) appData
-
-
-findFirstTagItem sectionId activeTagId appData =
-    getSectionItems sectionId (findTag activeTagId) (\items -> List.head items) appData
-
-
+makeSectionContentData : SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData
 makeSectionContentData activeSectionId appData itemIndexFn nextRoute =
     getSectionItems activeSectionId findGalleryWithTagsSectionType (makeItemContentData nextRoute itemIndexFn) appData
         |> Maybe.withDefault { items = [], activeItemIndex = 0 }
         |> ContentData
 
 
+makeTagContentData : SectionId -> TagId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData
 makeTagContentData activeSectionId activeTagId appData itemIndexFn nextRoute =
     getSectionItems activeSectionId (findTag activeTagId) (makeItemContentData nextRoute itemIndexFn) appData
         |> Maybe.withDefault { items = [], activeItemIndex = 0 }
         |> ContentData
 
 
+makeMobileSectionContentData : Float -> SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData
 makeMobileSectionContentData sliderHeight activeSectionId appData itemIndexFn nextRoute =
     getSectionItems activeSectionId findGalleryWithTagsSectionType (makeMobileItemContentData sliderHeight nextRoute itemIndexFn) appData
         |> Maybe.withDefault { items = [], activeItemIndex = 0, sliderHeight = 0 }
         |> MobileContentData
 
 
+makeMobileTagContentData : Float -> SectionId -> TagId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData
 makeMobileTagContentData sliderHeight activeSectionId activeTagId appData itemIndexFn nextRoute =
     getSectionItems activeSectionId (findTag activeTagId) (makeMobileItemContentData sliderHeight nextRoute itemIndexFn) appData
         |> Maybe.withDefault { items = [], activeItemIndex = 0, sliderHeight = 0 }
         |> MobileContentData
 
 
+isSectionActive : SectionId -> SectionId -> Bool
 isSectionActive sectionId activeSectionId =
     sectionId == activeSectionId
 
 
+isTagActive : TagId -> TagId -> Bool
 isTagActive tagId activeTagId =
     tagId == activeTagId
 
 
+makeMenuTagData : List TagData -> SectionId -> List MenuTagData
 makeMenuTagData tags sectionId =
     List.map
         (\{ tagId, label } ->
@@ -1087,6 +1097,7 @@ routeParser data =
         ]
 
 
+parseToRoute : Url.Url -> AppData -> Route
 parseToRoute url data =
     Maybe.withDefault Root (parse (routeParser data) url)
 
