@@ -27,6 +27,7 @@ mobileBreakpoint =
 
 type alias Flags =
     { apiBaseUrl : String
+    , apiProtocol : String
     , apiPort : String
     , apiUrl : String
     }
@@ -352,10 +353,22 @@ main =
 
 
 init : Flags -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
-init { apiBaseUrl, apiUrl, apiPort } url key =
+init { apiBaseUrl, apiUrl, apiPort, apiProtocol } url key =
     ( InitModel (InitModelData url key Nothing Nothing)
     , Cmd.batch
-        [ get { url = "http://" ++ apiBaseUrl ++ ":" ++ apiPort ++ "/" ++ apiUrl, expect = expectJson SetData appDataDecoder }
+        [ get
+            { url =
+                apiProtocol ++ "://" ++ apiBaseUrl
+                    ++ (if apiPort /= "none" then
+                            ":" ++ apiPort
+
+                        else
+                            ""
+                       )
+                    ++ "/"
+                    ++ apiUrl
+            , expect = expectJson SetData appDataDecoder
+            }
         , Task.perform SetViewport getViewport
         ]
     )
