@@ -2,22 +2,21 @@
 
 require("./styles.scss");
 
+const devFlags = {
+  apiProtocol: "http",
+  apiBaseUrl: 'localhost',
+  apiPort: '3061',
+  apiUrl: 'data'
+}
+
+const prodFlags = {
+  apiProtocol: "https",
+  apiBaseUrl: "d3n5xpivjiodis.cloudfront.net",
+  apiPort: "none",
+  apiUrl: "data.json"
+}
+
 const {Elm} = require('./Main');
 const app = Elm.Main.init({
-  flags: {
-    apiProtocol: "http",
-    apiBaseUrl: 'localhost',
-    apiPort: '3061',
-    apiUrl: 'data'
-  }
+  flags: process.env.NODE_ENV === 'production' ? prodFlags : devFlags
 });
-
-// apiProtocol: "https",
-//   apiBaseUrl: "d3n5xpivjiodis.cloudfront.net",
-//   apiPort: "none",
-//   apiUrl: "data.json"
-
-
-// apiBaseUrl: "localhost",
-//   apiPort: "3061",
-//   apiUrl: "data"

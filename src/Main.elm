@@ -358,7 +358,9 @@ init { apiBaseUrl, apiUrl, apiPort, apiProtocol } url key =
     , Cmd.batch
         [ get
             { url =
-                apiProtocol ++ "://" ++ apiBaseUrl
+                apiProtocol
+                    ++ "://"
+                    ++ apiBaseUrl
                     ++ (if apiPort /= "none" then
                             ":" ++ apiPort
 
@@ -1120,9 +1122,11 @@ relativePos event =
     event.pointer.offsetPos
 
 
-debugLog s x =
-    let
-        _ =
-            Debug.log s x
-    in
-    x
+
+--
+--debugLog s x =
+--    let
+--        _ =
+--            Debug.log s x
+--    in
+--    x
