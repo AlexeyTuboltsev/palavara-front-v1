@@ -2,7 +2,6 @@ $top-bar-height: 4.1rem;
 $screen-height: 100vh;
 
 $line-height: 144%;
-//$image-height: calc((100vh - #{$top-bar-height}) * 0.7);
 
 $color-canvas: #ffffff;
 $color-light-gray: #cccccc;
@@ -89,7 +88,7 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  background-color: #ffffff;
+  background-color: $color-canvas;
   font-family: 'Brutal Type', sans-serif;
 }
 
@@ -116,7 +115,7 @@ body {
     align-items: center;
     width: 8.33rem;
     height: 8.33rem;
-    background: #ffffff;
+    background: $color-canvas;
     margin: 0 auto;
     border: 1px solid #a5a5a5;
     border-radius: calc(8.33rem / 2);
@@ -410,7 +409,7 @@ body {
     padding: 5.2rem 2.7rem;
     align-self: start;
     margin: 0;
-    background-color: #ffffff;
+    background-color: $color-canvas;
 
     .logo {
       grid-column: 1;
@@ -551,7 +550,7 @@ body {
     left: initial;
     height: initial;
     z-index: initial;
-    background-color: #ffffff;
+    background-color: $color-canvas;
     display: grid;
     grid-template: 1fr / auto;
     grid-auto-rows: auto;
@@ -698,7 +697,6 @@ body {
     align-self: start;
     padding: 5.2rem 2rem 5.2rem 0;
   }
-
 }
 
 .image {
@@ -712,21 +710,19 @@ body {
   background-color: $color-canvas;
   cursor: pointer;
 
-  transition-property: min-height;
+  opacity: 0;
+
+  transition-property: min-height, opacity;
   transition-duration: 1s;
 
-  & img {
-    width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    margin-top: auto;
-    margin-bottom: 0;
+  &:hover {
+    opacity:1;
   }
 
   @media screen and (min-width: 1366px) {
     display: flex;
     width: 100%;
-    background-color: #ffffff;
+    background-color: $color-canvas;
     align-self: center;
     justify-self: center;
     padding: 0;
@@ -734,6 +730,12 @@ body {
   }
 
   & img {
+    width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    margin-top: auto;
+    margin-bottom: 0;
+
     @media screen and (min-width: 1366px) {
       align-self: center;
       justify-self: center;
@@ -745,22 +747,9 @@ body {
     }
   }
 
-  &.fadeout {
-    @media screen and (min-width: 1366px) {
-      opacity: 1;
-      animation: none;
-    }
-  }
-
-  &.fadein {
-    @media screen and (min-width: 1366px) {
-      opacity: 1;
-      animation: none;
-    }
-  }
-
   &.active-image {
     min-height: 1rem;
+    opacity: 1;
 
     &.active-image img {
       margin-top: 0;
@@ -806,23 +795,6 @@ body {
   align-items: center;
   justify-items: center;
   transition: top 1s ease 0s;
-
-  .image {
-    opacity: 0;
-    transition-property: opacity;
-    transition-duration: 1s;
-  }
-
-  .image.active-image {
-    opacity: 1;
-  }
-
-  &:active,
-  &:hover {
-    .image {
-      opacity: 1;
-    }
-  }
 
   @media screen and (min-width: 1024px) {
     grid-row: 2;
