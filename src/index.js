@@ -1,10 +1,9 @@
 'use strict';
 
 require("./styles.scss");
-
 const devFlags = {
   apiProtocol: "http",
-  apiBaseUrl: 'localhost',
+  apiBaseUrl: ELM_CONFIG.dataApiUrl,
   apiPort: '3061',
   apiUrl: 'data'
 }

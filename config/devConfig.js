@@ -1,7 +1,7 @@
 module.exports = {
   ELM_CONFIG: {
     pictureBaseUrl: "'/img/'",
-    dataApiUrl: "'192.168.1.51:3061'",
+    dataApiUrl: "'192.168.0.104'",
     dataApiPath: "'data'",
     protocol: "'http'"
   }
