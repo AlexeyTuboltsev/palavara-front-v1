@@ -11,9 +11,10 @@ import Html.Attributes exposing (class, href, id, src, style)
 import Html.Events exposing (onMouseOut, onMouseOver)
 import Html.Events.Extra exposing (onClickPreventDefault)
 import Html.Events.Extra.Pointer as Pointer
+import Html.Events.Extra.Touch as Touch
 import Http exposing (expectJson, get)
 import Icons
-import List.Extra exposing (find, findIndex, indexedFoldl)
+import List.Extra exposing (find, findIndex, indexedFoldl, getAt)
 import Result exposing (Result)
 import Task
 import Url exposing (Url)
@@ -82,7 +83,12 @@ type alias ItemContentData =
 
 
 type alias MobileContentDataType =
-    { items : List ItemContentData, activeItemIndex : Int, sliderHeight : Float }
+    { items : List ItemContentData
+    , activeItemIndex : Int
+    , sliderHeight : Float
+    , topOffset: Float
+    , pointerStart: Maybe (Float, Float)
+    }
 
 
 type alias ContentDataType =
@@ -165,15 +171,12 @@ type Msg
     | UpMsg ( Float, Float )
 
 
-
---| FadeInPictures
---| FadeOutPictures
 -- UPDATE --
 
-
+allFieldsPresent: Model -> Maybe (Route, Model)
 allFieldsPresent newModel =
     case newModel of
-        InitModel d ->
+        InitModel data ->
             Maybe.map4
                 (\appData vp key url ->
                     let
@@ -182,36 +185,13 @@ allFieldsPresent newModel =
                     in
                     ( route, InitProgressModel { data = appData, viewport = vp, key = key, route = route } )
                 )
-                d.data
-                d.viewport
-                (Just d.key)
-                (Just d.url)
+                data.data
+                data.viewport
+                (Just data.key)
+                (Just data.url)
 
         _ ->
             Nothing
-
-
-setRoute modelData route =
-    if modelData.viewport.viewport.width <= mobileBreakpoint then
-        case route of
-            SectionRoute _ ->
-                mobileSetRoute modelData route
-
-            SectionImageRoute _ _ ->
-                mobileSetRoute modelData route
-
-            TagRoute _ _ ->
-                mobileSetRoute modelData route
-
-            TagImageRoute _ _ _ ->
-                mobileSetRoute modelData route
-
-            _ ->
-                ( ReadyModel { modelData | route = route, page = routeToPage route modelData.data }, Navigation.pushUrl modelData.key <| routeToUrlPath route )
-
-    else
-        ( ReadyModel { modelData | route = route, page = routeToPage route modelData.data }, Navigation.pushUrl modelData.key <| routeToUrlPath route )
-
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
@@ -281,9 +261,14 @@ update message model =
                     ( ReadyModel { readyModelData | viewport = viewport }, Cmd.none )
 
                 SetRoute route ->
+                    let
+                        _ = Debug.log "setRoute" route
+                    in
                     setRoute readyModelData route
 
                 SetSectionRouteWithPageDimensions route dimensions ->
+                    let _ = Debug.log "SetSectionRouteWithPageDimensions" dimensions
+                    in
                     case dimensions of
                         Err _ ->
                             --TODO this is a loop!
@@ -320,23 +305,187 @@ update message model =
                         in
                         ( ReadyModel { readyModelData | route = route, page = page }, Navigation.pushUrl readyModelData.key <| Url.toString url )
 
+                DownMsg (xCoordinate, yCoordinate) -> --FIXME move this to a util fn
+                    case readyModelData.page of
+                        GalleryPage galleryPageData ->
+                            case galleryPageData of
+                                GalleryPageData menuData contentData ->
+                                    case contentData of
+                                        MobileContentData mobileContentData ->
+                                           let
+                                              --_ = Debug.log "-----> START yCoordinate:" yCoordinate
+                                              --_ = Debug.log "xCoordinate:" xCoordinate
+                                              --_ = Debug.log "topOffset:" mobileContentData.topOffset
+
+                                              newMobileContentData  = MobileContentData {mobileContentData | pointerStart = Just (yCoordinate,mobileContentData.topOffset)}
+                                            in
+                                            ( ReadyModel {readyModelData | page = (GalleryPage <| GalleryPageData menuData newMobileContentData )}, Cmd.none  )
+                                        _ ->
+                                            ( ReadyModel readyModelData, Cmd.none  )
+                        _ ->
+                            ( ReadyModel readyModelData, Cmd.none  )
+
+
+                MoveMsg (xCoordinate, yCoordinate) ->
+                    case readyModelData.page of
+                        GalleryPage galleryPageData ->
+                            case galleryPageData of
+                                GalleryPageData menuData contentData ->
+                                    case contentData of
+                                        MobileContentData mobileContentData ->
+                                           case mobileContentData.pointerStart of
+                                               Just pointerStart ->
+                                                   let
+                                                       newTopOffset = calculateSliderTopOffset pointerStart mobileContentData.topOffset yCoordinate
+                                                       --_ = Debug.log "xCoordinate:" xCoordinate
+                                                       newMobileContentData  = MobileContentData {mobileContentData | pointerStart = Just (pointerStart), topOffset = newTopOffset}
+                                                   in
+                                                   ( ReadyModel {readyModelData | page = (GalleryPage <| GalleryPageData menuData newMobileContentData )}, Cmd.none  )
+                                               Nothing ->
+                                                    ( ReadyModel readyModelData, Cmd.none  )
+                                        _ ->
+                                            ( ReadyModel readyModelData, Cmd.none  )
+                        _ ->
+                            ( ReadyModel readyModelData, Cmd.none  )
+
+                UpMsg (xCoordinate, yCoordinate) ->
+                    case readyModelData.page of
+                        GalleryPage galleryPageData ->
+                            case galleryPageData of
+                                GalleryPageData menuData contentData ->
+                                    case contentData of
+                                        MobileContentData mobileContentData ->
+                                           case mobileContentData.pointerStart of
+                                               Just pointerStart ->
+                                                   let
+                                                       (newTopOffset, maybeNewItem) = calculateFinalSliderTopOffset mobileContentData.sliderHeight mobileContentData.topOffset mobileContentData.activeItemIndex mobileContentData.items pointerStart
+                                                       _ = Debug.log "maybeNewItem" maybeNewItem
+                                                       newRoute = case maybeNewItem of
+                                                           Nothing ->
+                                                               readyModelData.route
+                                                           Just {itemId} ->
+                                                               updateRoute readyModelData.route itemId
+                                                       newPage = routeToMobilePage newRoute mobileContentData.sliderHeight readyModelData.data
+                                                   in
+                                                   ( ReadyModel {readyModelData | page = newPage}, Cmd.none  )
+                                               Nothing ->
+                                                    ( ReadyModel readyModelData, Cmd.none  )
+                                        _ ->
+                                            ( ReadyModel readyModelData, Cmd.none  )
+                        _ ->
+                            ( ReadyModel readyModelData, Cmd.none  )
                 _ ->
                     ( model, Cmd.none )
 
+updateRoute oldRoute newImageId =
+    case oldRoute of
+        SectionRoute _ ->
+            oldRoute
 
-mobileSetRoute readyModelData route =
-    ( ReadyModel { readyModelData | route = route, page = routeToMobilePage route 0 readyModelData.data }
-    , Task.attempt
-        (SetSectionRouteWithPageDimensions route)
-        (Task.map
-            (\viewport ->
-                viewport.viewport.height
+        SectionImageRoute sectionId _ ->
+             SectionImageRoute sectionId newImageId
+
+        TagRoute _ _ ->
+            oldRoute
+
+        TagImageRoute sectionId tagId _ ->
+            TagImageRoute sectionId tagId newImageId
+
+        _ ->
+            oldRoute
+
+calculateSliderTopOffset pointerStart topOffset yCoordinate =
+   let
+       (initialPointerStart, oldTopOffset) = pointerStart
+       delta = (yCoordinate - initialPointerStart)
+   in   oldTopOffset + delta
+
+calculateFinalSliderTopOffset sliderHeight topOffset activeItemIndex items pointerStart =
+    let
+        threshold = 22
+        (_, oldTopOffset) = pointerStart
+        delta = oldTopOffset - topOffset
+        _ = Debug.log "calculateFinalSliderTopOffset" <| delta
+    in
+        if abs delta > threshold then
+            let
+                newActiveItemIndex =
+                    case delta > 0 of
+                        True ->
+                            clamp 0 (List.length items) (activeItemIndex + 1)
+                        False ->
+                            clamp 0 (List.length items) (activeItemIndex - 1)
+                maybeNewItem = getAt newActiveItemIndex items
+
+            in
+            (calculateTopOffset sliderHeight newActiveItemIndex,maybeNewItem)
+
+        else
+            (oldTopOffset, getAt activeItemIndex items)
+
+setRoute modelData route =
+    if modelData.viewport.viewport.width <= mobileBreakpoint then
+        case route of
+            SectionRoute _ ->
+                mobileSetRoute modelData route
+
+            SectionImageRoute _ _ ->
+                mobileSetRoute modelData route
+
+            TagRoute _ _ ->
+                mobileSetRoute modelData route
+
+            TagImageRoute _ _ _ ->
+                mobileSetRoute modelData route
+
+            _ ->
+                ( ReadyModel { modelData | route = route, page = routeToPage route modelData.data }, Navigation.pushUrl modelData.key <| routeToUrlPath route )
+
+    else
+        ( ReadyModel { modelData | route = route, page = routeToPage route modelData.data }, Navigation.pushUrl modelData.key <| routeToUrlPath route )
+
+
+mobileSetRoute modelData route =
+    let mobileRoute = routeToMobileRoute route modelData.data
+
+    in
+    ( ReadyModel { modelData | route = mobileRoute, page = routeToMobilePage mobileRoute 0 modelData.data }
+    , Cmd.batch [
+        Navigation.pushUrl modelData.key <| routeToUrlPath mobileRoute
+        , Task.attempt
+            (SetSectionRouteWithPageDimensions mobileRoute)
+            (Task.map
+                (\viewport ->
+                    viewport.viewport.height
+                )
+                (getViewportOf "slider-window")
             )
-            (getViewportOf "slider-window")
-        )
+    ]
+
     )
 
 
+routeToMobileRoute route data =
+    case route of
+        SectionRoute sectionId ->
+            let item =
+                    getSectionItems sectionId findGalleryWithTagsSectionType (\items -> getAt 0 items ) data
+            in case item of
+                Nothing ->
+                    route
+                Just i ->
+                    SectionImageRoute sectionId i.itemId
+
+        TagRoute sectionId tagId ->
+            let item =
+                    getSectionItems sectionId (findTag tagId) (\items -> getAt 0 items ) data
+            in case item of
+                Nothing ->
+                    route
+                Just i ->
+                    TagImageRoute sectionId tagId i.itemId
+
+        _ -> route
 
 -- MAIN --
 
@@ -389,16 +538,16 @@ view : Model -> Browser.Document Msg
 view model =
     case model of
         InitModel _ ->
-            Browser.Document "starting" initPage
+            Browser.Document "** palavara **" initPage
 
         InitProgressModel _ ->
-            Browser.Document "init" initPage
+            Browser.Document "** palavara **" initPage
 
         InitErrorModel _ ->
-            Browser.Document "init" [ text "error" ]
+            Browser.Document "** palavara **" [ text "error" ]
 
         ReadyModel readyModelData ->
-            Browser.Document "*-PALAVARA-*" <| contentPage readyModelData.page
+            Browser.Document "** palavara **" <| contentPage readyModelData.page
 
 
 initPage =
@@ -478,10 +627,6 @@ buildPictures contentData =
     div
         [ class "slider-window"
         , id "slider-window"
-        , Pointer.onDown (relativePos >> DownMsg)
-        , Pointer.onMove (relativePos >> MoveMsg)
-        , Pointer.onUp (relativePos >> UpMsg)
-        , Pointer.onCancel (relativePos >> UpMsg)
         ]
         [ div
             [ class "image-group" ]
@@ -500,16 +645,6 @@ buildPictures contentData =
 
 
 buildMobilePictures contentData =
-    let
-        imageHeight =
-            contentData.sliderHeight * 0.7
-
-        initialOffset =
-            (contentData.sliderHeight - imageHeight) / 2
-
-        gridGap =
-            20
-    in
     div
         [ class "slider-window"
         , id "slider-window"
@@ -517,13 +652,11 @@ buildMobilePictures contentData =
         , Pointer.onMove (relativePos >> MoveMsg)
         , Pointer.onUp (relativePos >> UpMsg)
         , Pointer.onCancel (relativePos >> UpMsg)
+        , Html.Attributes.style "touch-action" "none"
         ]
         [ div
             [ class "image-group"
-            , style "top" (String.fromFloat (initialOffset - ((imageHeight + gridGap) * toFloat contentData.activeItemIndex)) ++ "px")
-
-            --, onMouseOver FadeInPictures
-            --, onMouseOut FadeOutPictures
+            , style "top" (String.fromFloat (contentData.topOffset) ++ "px")
             , id "image-group"
             ]
             (List.map
@@ -824,7 +957,9 @@ routeToPage route appData =
 
 routeToMobilePage : Route -> Float -> AppData -> Page
 routeToMobilePage route sliderHeight appData =
-    routeToPageInternal makeMobileSectionMenuData makeMobileTagMenuData (makeMobileSectionContentData sliderHeight) (makeMobileTagContentData sliderHeight) route appData
+    let _ = Debug.log "routeToMobilePage" route
+    in
+    routeToPageInternal makeMobileSectionMenuData makeMobileTagMenuData (generateMobileSectionContentData sliderHeight) (generateMobileTagContentData sliderHeight) route appData
 
 
 findSection sectionList sectionId =
@@ -895,21 +1030,38 @@ makeItemContentData nextRoute itemIndexFn items =
             )
 
 
-makeMobileItemContentData : Float -> (ItemId -> Route) -> (List ItemData -> Maybe Int) -> List ItemData -> Maybe MobileContentDataType
-makeMobileItemContentData sliderHeight nextRoute itemIndexFn items =
-    (\is -> itemIndexFn is) items
+generateMobileItemContentData : Float -> (ItemId -> Route) -> (List ItemData -> Maybe Int) -> List ItemData -> Maybe MobileContentDataType
+generateMobileItemContentData sliderHeight nextRoute itemIndexFn items =
+    (\itms -> itemIndexFn itms) items
         |> Maybe.map
             (\activeItemIndex ->
                 let
                     onClickMessage =
                         \itemId -> SetRoute <| nextRoute itemId
+
+                    topOffset =
+                        calculateTopOffset sliderHeight activeItemIndex
+
                 in
                 indexedFoldl
                     (makeItemContentDataInternal activeItemIndex onClickMessage)
-                    { items = [], activeItemIndex = 0, sliderHeight = sliderHeight }
+                    { items = [], activeItemIndex = 0, sliderHeight = sliderHeight, topOffset = topOffset, pointerStart = Nothing }
                     items
             )
 
+calculateTopOffset sliderHeight activeItemIndex =
+    let
+        imageHeight =
+            sliderHeight * 0.7
+
+        initialOffset =
+            (sliderHeight - imageHeight) / 2
+
+        gridGap =
+            20
+
+    in
+        initialOffset - ((imageHeight + gridGap) * toFloat activeItemIndex)
 
 findItemIndex : ItemId -> List ItemData -> Maybe Int
 findItemIndex activeItemId items =
@@ -944,17 +1096,17 @@ makeTagContentData activeSectionId activeTagId appData itemIndexFn nextRoute =
         |> ContentData
 
 
-makeMobileSectionContentData : Float -> SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData
-makeMobileSectionContentData sliderHeight activeSectionId appData itemIndexFn nextRoute =
-    getSectionItems activeSectionId findGalleryWithTagsSectionType (makeMobileItemContentData sliderHeight nextRoute itemIndexFn) appData
-        |> Maybe.withDefault { items = [], activeItemIndex = 0, sliderHeight = 0 }
+generateMobileSectionContentData : Float -> SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData
+generateMobileSectionContentData sliderHeight activeSectionId appData itemIndexFn nextRoute =
+    getSectionItems activeSectionId findGalleryWithTagsSectionType (generateMobileItemContentData sliderHeight nextRoute itemIndexFn) appData
+        |> Maybe.withDefault { items = [], activeItemIndex = 0, sliderHeight = 0, topOffset = 0, pointerStart = Nothing  }
         |> MobileContentData
 
 
-makeMobileTagContentData : Float -> SectionId -> TagId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData
-makeMobileTagContentData sliderHeight activeSectionId activeTagId appData itemIndexFn nextRoute =
-    getSectionItems activeSectionId (findTag activeTagId) (makeMobileItemContentData sliderHeight nextRoute itemIndexFn) appData
-        |> Maybe.withDefault { items = [], activeItemIndex = 0, sliderHeight = 0 }
+generateMobileTagContentData : Float -> SectionId -> TagId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> ContentData
+generateMobileTagContentData sliderHeight activeSectionId activeTagId appData itemIndexFn nextRoute =
+    getSectionItems activeSectionId (findTag activeTagId) (generateMobileItemContentData sliderHeight nextRoute itemIndexFn) appData
+        |> Maybe.withDefault { items = [], activeItemIndex = 0, sliderHeight = 0, topOffset = 0, pointerStart = Nothing  }
         |> MobileContentData
 
 
