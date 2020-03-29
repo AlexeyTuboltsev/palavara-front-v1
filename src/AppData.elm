@@ -1,6 +1,5 @@
 module AppData exposing (..)
 
-import Dict exposing (Dict)
 import Json.Decode as JD
 
 
@@ -39,9 +38,7 @@ type SectionData
 type alias GalleryWithTagsSectionData =
     { label : String
     , sectionId : SectionId
-    , items : List ItemData --Dict ItemId ItemData
-
-    --, itemOrder : List ItemId
+    , items : List ItemData
     , tags : List TagData
     }
 
@@ -95,16 +92,6 @@ itemsDecoder =
     JD.list itemDataDecoder
 
 
-
---|> JD.map (\decodedList -> List.map (\item -> ( item.itemId, item )) decodedList)
---|> JD.map Dict.fromList
-
-
-itemOrderDecoder =
-    JD.list itemDataDecoder
-        |> JD.map (\decodedList -> List.map (\item -> item.itemId) decodedList)
-
-
 sectionDataDecoder : JD.Decoder SectionData
 sectionDataDecoder =
     JD.field "type" JD.string
@@ -116,7 +103,6 @@ sectionDataDecoder =
                             (JD.field "label" JD.string)
                             (JD.field "sectionId" JD.string)
                             (JD.field "items" itemsDecoder)
-                            --(JD.field "items" itemOrderDecoder)
                             (JD.field "tags" (JD.list tagDataDecoder))
                             |> JD.map GalleryWithTagsSectionType
 
