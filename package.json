@@ -19,9 +19,7 @@
     "dev": "webpack-dev-server --hot --colors --port 3000",
     "prod": "webpack -p",
     "analyse": "elm-analyse -s -p 3001 -o",
-    "deploy": "npm run build && npm run deploy:publish && npm run deploy:create-invalidation",
-    "deploy:publish": "aws s3 sync build/ s3://palavara-dev",
-    "deploy:create-invalidation": "aws cloudfront create-invalidation --distribution-id E303OX0HZUQ9TN --invalidation-batch file://scripts/invalidation-batch.json"
+    "deploy": "npm run build && scripts/deploy.sh"
   },
   "license": "MIT",
   "devDependencies": {
