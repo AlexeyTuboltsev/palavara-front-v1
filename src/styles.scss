@@ -253,6 +253,7 @@ body {
     grid-column: 1/span 3;
     text-align: center;
     font-size: 1.6rem;
+
   }
 
   .menu-entry-label {
@@ -266,6 +267,7 @@ body {
       font-weight: normal;
       color: $color-gray;
       line-height: $line-height;
+      white-space: nowrap;
     }
   }
 
@@ -628,6 +630,7 @@ body {
       width: calc(100% - 5rem);
       margin-left: 5rem;
     }
+
     .menu-entry-groups a {
       align-self: flex-start;
       display: block;
@@ -636,14 +639,17 @@ body {
       color: #a5a5a5;
       line-height: 144%;
     }
+
     .menu-entry-groups a:hover:before {
       content: "— ";
     }
+
     .menu-entry-groups a.active {
       color: #000045;
       text-transform: uppercase;
       font-weight: bold;
     }
+
     .menu-entry-groups a.active:before {
       content: "\2014\00a0";
       color: #a5a5a5;
