@@ -713,11 +713,7 @@ body {
   opacity: 0;
 
   transition-property: min-height, opacity;
-  transition-duration: 1s;
-
-  &:hover {
-    opacity:1;
-  }
+  transition-duration: 1s, 0.3s;
 
   @media screen and (min-width: 1366px) {
     display: flex;
@@ -755,7 +751,6 @@ body {
       margin-top: 0;
       margin-bottom: 0;
     }
-
   }
 
   &.active-image + .image {
@@ -794,7 +789,13 @@ body {
   grid-row-gap: 2rem;
   align-items: center;
   justify-items: center;
-  //transition: top 1s ease 0s;
+  transition: top 0.2s ease 0s;
+
+  &:active {
+    .image {
+      opacity: 1;
+    }
+  }
 
   @media screen and (min-width: 1024px) {
     grid-row: 2;
@@ -807,6 +808,7 @@ body {
     grid-row-gap: 8rem;
     align-items: center;
     justify-items: center;
+
     .image {
       opacity: 1;
       transition: none;
