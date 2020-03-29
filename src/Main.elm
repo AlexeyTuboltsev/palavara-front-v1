@@ -5,7 +5,6 @@ import Browser
 import Browser.Dom exposing (Viewport, getElement, getViewport, getViewportOf)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation
-import Debug
 import Html exposing (Html, a, br, div, img, span, text)
 import Html.Attributes exposing (class, href, id, src, style)
 import Html.Events exposing (onMouseOut, onMouseOver)
@@ -321,9 +320,6 @@ update message model =
                                     case contentData of
                                         MobileContentData mobileContentData ->
                                             let
-                                                --_ = Debug.log "-----> START yCoordinate:" yCoordinate
-                                                --_ = Debug.log "xCoordinate:" xCoordinate
-                                                --_ = Debug.log "topOffset:" mobileContentData.topOffset
                                                 newMobileContentData =
                                                     MobileContentData { mobileContentData | pointerStart = Just ( yCoordinate, mobileContentData.topOffset ) }
                                             in
@@ -348,7 +344,6 @@ update message model =
                                                         newTopOffset =
                                                             calculateSliderTopOffset pointerStart mobileContentData.topOffset yCoordinate
 
-                                                        --_ = Debug.log "xCoordinate:" xCoordinate
                                                         newMobileContentData =
                                                             MobileContentData { mobileContentData | pointerStart = Just pointerStart, topOffset = newTopOffset }
                                                     in
@@ -375,9 +370,6 @@ update message model =
                                                     let
                                                         ( newTopOffset, maybeNewItem ) =
                                                             calculateFinalSliderTopOffset mobileContentData.sliderHeight mobileContentData.topOffset mobileContentData.activeItemIndex mobileContentData.items pointerStart
-
-                                                        _ =
-                                                            Debug.log "maybeNewItem" maybeNewItem
 
                                                         newRoute =
                                                             case maybeNewItem of
@@ -444,9 +436,6 @@ calculateFinalSliderTopOffset sliderHeight topOffset activeItemIndex items point
 
         delta =
             oldTopOffset - topOffset
-
-        _ =
-            Debug.log "calculateFinalSliderTopOffset" <| delta
     in
     if abs delta > threshold then
         let
@@ -833,10 +822,6 @@ routeToUrlPath route =
 
 makeRootMenuData : SectionData -> MenuSectionData
 makeRootMenuData section =
-    let
-        _ =
-            Debug.log "->>----makeRootMenuData"
-    in
     case section of
         GalleryWithTagsSectionType { sectionId, label, tags } ->
             makeMenuEntryData GalleryWithTags False sectionId label (SectionRoute sectionId) (makeMenuTagData tags sectionId)
@@ -850,10 +835,6 @@ makeRootMenuData section =
 
 makeMobileRootMenuData : SectionData -> MenuSectionData
 makeMobileRootMenuData section =
-    let
-        _ =
-            Debug.log "-----makeMobileRootMenuData"
-    in
     case section of
         GalleryWithTagsSectionType { sectionId, label, tags, items } ->
             let
@@ -906,10 +887,7 @@ makeMobileSectionMenuData activeSectionId sections =
 makeMobileTagMenuData : SectionId -> TagId -> List SectionData -> MenuData
 makeMobileTagMenuData activeSectionId activeTagId sections =
     let
-        _ =
-            Debug.log "makeMobileTagMenuData"
-
-        bla tags sectionId =
+        generateTagMenuData tags sectionId =
             List.map
                 (\{ tagId, label, items } ->
                     let
@@ -939,7 +917,7 @@ makeMobileTagMenuData activeSectionId activeTagId sections =
                 )
                 tags
     in
-    makeSectionMenuDataInternal activeSectionId (filterMenuInfoSection sections) bla
+    makeSectionMenuDataInternal activeSectionId (filterMenuInfoSection sections) generateTagMenuData
 
 
 filterMenuInfoSection : List SectionData -> List SectionData
@@ -998,7 +976,6 @@ makeMenuEntryData menuSectionType sectionIsActive sectionId label nextRoute tagM
 
 
 routeToPageInternal rootMenuFn sectionMenuFn tagMenuFn sectionFn tagFn route appData =
-
     case route of
         Root ->
             List.map rootMenuFn appData
