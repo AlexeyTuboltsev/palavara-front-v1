@@ -509,6 +509,9 @@ galleryPage data =
                     GalleryContentData desktopContentData ->
                         buildPictures desktopContentData
 
+                    GalleryImageContentData desktopContentImageData ->
+                        buildPicturesAndImage desktopContentImageData
+
                     MobileContentData mobileContentData ->
                         buildMobilePictures mobileContentData
                 ]
@@ -583,30 +586,27 @@ buildSectionPicture urlString onClickMessage isActive itemId =
 
 buildFullMenu : MenuData -> Html Msg
 buildFullMenu menuData =
-    div [ class "menu" ] (buildEntries menuData)
+    div [ class "menu-wrapper" ] [
+    div [class "menu-background"] [ div [class "menu-background-inner"] [] ]
+    , div [ class "menu" ] (List.append (buildEntries menuData) [buildLogo])
+    ]
+
 
 
 buildEntries : MenuData -> List (Html Msg)
 buildEntries menuData =
-    buildLogo
-        --:: buildInfoEntry
-        :: List.map (\sectionData -> buildEntry sectionData) menuData
+    List.append
+        [
+        div [ class "logo-label" ] [ text "Varvara Polyakova"]
+        , div [class "menu-line"] []
+        ]
+        (List.map (\sectionData -> buildEntry sectionData) menuData)
+
 
 
 buildLogo : Html Msg
 buildLogo =
-    div [ class "logo" ]
-        [ div [ class "logo-label" ]
-            [ text "Varvara Polyakova"
-            , span [ class "logo-label-byline" ]
-                [ br [] []
-                , text "illustration, graphics, ceramics "
-                ]
-            ]
-        , div [ class "logo-image", onClickPreventDefault <| GoToRoute Root ]
-            [ Icons.logo
-            ]
-        ]
+        div [ class "logo", onClickPreventDefault <| GoToRoute Root ] [ Icons.logo  ]
 
 
 buildEntry : MenuSectionData -> Html Msg
