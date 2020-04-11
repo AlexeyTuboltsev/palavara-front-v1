@@ -4,17 +4,16 @@ import AppData exposing (..)
 import Browser
 import Browser.Dom exposing (Viewport, getViewport, getViewportOf)
 import Browser.Events exposing (onResize)
-import Browser.Navigation as Navigation
-import Constants exposing (mobileBreakpoint)
-import Html exposing (Html, a, br, div, img, span, text)
+import Browser.Navigation as Navigation exposing (Key)
+import Html exposing (Html, a, div, img, span, text)
 import Html.Attributes exposing (class, href, id, src, style)
 import Html.Events.Extra exposing (onClickPreventDefault)
 import Html.Events.Extra.Pointer as Pointer
 import Http exposing (expectJson, get)
 import Icons
-import List.Extra exposing (find, findIndex, getAt, indexedFoldl)
+import List.Extra exposing (getAt)
 import Message exposing (Msg(..))
-import Page exposing (GalleryContentData(..), GalleryPageData, InfoPageData, ListPageData, MenuData, MenuSectionData, MenuSectionType(..), MenuTagData, Page(..), StartPageData, calculateTopOffset, routeToMobilePage, routeToPage)
+import Page exposing (GalleryContentData(..), GalleryPageData, InfoPageData, ListPageData, MenuData, MenuSectionData, MenuSectionType(..), MenuTagData, Page(..), StartPageData, calculateTopOffset, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoMenuData, generateRootMenuData,  getGalleryWithTagsSectionData, makeSectionMenuData)
 import Result exposing (Result)
 import Route exposing (Route(..), parseToRoute, routeToUrlPath)
 import Task
@@ -56,7 +55,6 @@ type alias InitModelData =
 
 type Model
     = ReadyModel ReadyModelData
-    | InitProgressModel InProgressModelData
     | InitModel InitModelData
     | InitErrorModel Http.Error
 
@@ -81,8 +79,8 @@ update message model =
                                     InitModel { initModel | data = Just data }
                             in
                             case allFieldsPresent newModel of
-                                Just ( route, initProgressModel ) ->
-                                    update (SetInitialRoute route) initProgressModel
+                                Just ( route, readyModel ) ->
+                                    generatePageData readyModel route
 
                                 Nothing ->
                                     ( newModel, Cmd.none )
@@ -93,8 +91,8 @@ update message model =
                             InitModel { initModel | viewport = Just viewport }
                     in
                     case allFieldsPresent newModel of
-                        Just ( route, initProgressModel ) ->
-                            update (SetInitialRoute route) initProgressModel
+                        Just ( route, readyModel ) ->
+                            generatePageData readyModel route
 
                         Nothing ->
                             ( newModel, Cmd.none )
@@ -102,32 +100,7 @@ update message model =
                 _ ->
                     ( model, Cmd.none )
 
-        InitProgressModel initProgressModel ->
-            case message of
-                SetInitialRoute route ->
-                    let
-                        page =
-                            case initProgressModel.viewport.viewport.width <= mobileBreakpoint of
-                                True ->
-                                    routeToMobilePage route 0 initProgressModel.data
-
-                                False ->
-                                    routeToPage route initProgressModel.data
-
-                        newModelData =
-                            { viewport = initProgressModel.viewport
-                            , key = initProgressModel.key
-                            , route = route
-                            , page = page
-                            , data = initProgressModel.data
-                            }
-                    in
-                    setRoute newModelData route
-
-                _ ->
-                    ( model, Cmd.none )
-
-        InitErrorModel errData ->
+        InitErrorModel _ ->
             case message of
                 _ ->
                     ( model, Cmd.none )
@@ -141,31 +114,26 @@ update message model =
                     ( ReadyModel { readyModelData | viewport = viewport }, Cmd.none )
 
                 GoToRoute route ->
-                    setRoute readyModelData route
+                    generatePageData readyModelData route
 
                 SetSectionRouteWithPageDimensions route dimensions ->
                     case dimensions of
                         Err _ ->
-                            let
-                                page =
-                                    -- TODO add an error page
-                                    routeToMobilePage Root 0 readyModelData.data
-
-                                newModel =
-                                    ReadyModel { readyModelData | route = route, page = page }
-                            in
-                            update (GoToRoute route) newModel
+                            --fixme this is a loop, goto root
+                            generatePageData readyModelData route
+                            --update (GoToRoute route) newModel
 
                         Ok sliderHeight ->
-                            let
-                                page =
-                                    routeToMobilePage route sliderHeight readyModelData.data
-
-                                newModel =
-                                    ReadyModel { readyModelData | route = route, page = page }
-                            in
-                            ( newModel, Navigation.pushUrl readyModelData.key <| routeToUrlPath route )
-
+                            --let
+                            --    page =
+                            --        routeToMobilePage route sliderHeight readyModelData.data
+                            --
+                            --    newModel =
+                            --        ReadyModel { readyModelData | route = route, page = page }
+                            --in
+                            --( newModel, Navigation.pushUrl readyModelData.key <| routeToUrlPath route )
+                            --fixme use sliderHeight
+                            generatePageData readyModelData route
 
                 DownMsg ( xCoordinate, yCoordinate ) ->
                     --FIXME move this to a util fn
@@ -235,10 +203,12 @@ update message model =
                                                                 Just { itemId } ->
                                                                     updateRoute readyModelData.route itemId
 
-                                                        newPage =
-                                                            routeToMobilePage newRoute mobileContentData.sliderHeight readyModelData.data
+                                                        --newPage =
+                                                        --    routeToMobilePage newRoute mobileContentData.sliderHeight readyModelData.data
                                                     in
-                                                    ( ReadyModel { readyModelData | page = newPage }, Cmd.none )
+                                                    --fixme redirect should happen as a result of generateRouteAndPageData. Use sliderHeight
+                                                    generatePageData readyModelData newRoute
+                                                    --( ReadyModel { readyModelData | page = newPage }, Cmd.none )
 
                                                 Nothing ->
                                                     ( ReadyModel readyModelData, Cmd.none )
@@ -253,37 +223,137 @@ update message model =
                     ( model, Cmd.none )
 
 
-setRoute modelData route =
-    let
-        cmdBatch =
-            [ Navigation.pushUrl modelData.key <| routeToUrlPath route ]
-    in
-    if modelData.viewport.viewport.width <= mobileBreakpoint then
-        let
-            mobileModelData =
-                ReadyModel { modelData | route = route, page = routeToMobilePage route 0 modelData.data }
+generatePageData : ReadyModelData -> Route -> ( Model, Cmd Msg )
+generatePageData modelData activeRoute =
+    --case modelData.viewport.viewport.width <= mobileBreakpoint of
+    --    True ->
+    --        let
+    --            mobileModelData =
+    --                ReadyModel { modelData | route = route, page = routeToMobilePage route 0 modelData.data }
+    --
+    --            mobileUpdate =
+    --                ( mobileModelData, Cmd.batch [ Navigation.pushUrl modelData.key <| routeToUrlPath route, getSliderViewport route ]  )
+    --        in
+    --        case route of
+    --            Root ->
+    --                ( mobileModelData, Navigation.pushUrl modelData.key <| routeToUrlPath route  )
+    --
+    --            InfoRoute ->
+    --                ( mobileModelData, Navigation.pushUrl modelData.key <| routeToUrlPath route  )
+    --
+    --            SectionRoute _ ->
+    --                mobileUpdate
+    --
+    --            SectionImageRoute _ _ ->
+    --                mobileUpdate
+    --
+    --            TagRoute _ _ ->
+    --                mobileUpdate
+    --
+    --            TagImageRoute _ _ _ ->
+    --                mobileUpdate
+    --
+    --    False ->
+    case activeRoute of
+        Root ->
+            let
+                ( finalRoute, page ) =
+                    List.map generateRootMenuData modelData.data
+                        |> Page.StartPageData
+                        |> StartPage
+                        |> Tuple.pair activeRoute
+            in
+            ( ReadyModel {modelData | page = page}, Navigation.pushUrl modelData.key <| routeToUrlPath finalRoute )
 
-            mobileUpdate =
-                ( mobileModelData, getSliderViewport route :: cmdBatch |> Cmd.batch )
-        in
-        case route of
-            SectionRoute _ ->
-                mobileUpdate
+        InfoRoute ->
+            let
+                ( finalRoute, page ) =
+                    List.map generateInfoMenuData modelData.data
+                        |> Page.InfoPageData
+                        |> InfoPage
+                        |> Tuple.pair activeRoute
+            in
+            ( ReadyModel {modelData | page = page}, Navigation.pushUrl modelData.key <| routeToUrlPath finalRoute )
 
-            SectionImageRoute _ _ ->
-                mobileUpdate
+        SectionRoute activeSectionId ->
+            let
+                maybeItems =
+                    findSection modelData.data activeSectionId
+                        |> Maybe.andThen (\sectionData -> getGalleryWithTagsSectionData sectionData)
+                        |> Maybe.map (\galleryWithTagsSectionData -> galleryWithTagsSectionData.items)
+            in
+            case maybeItems of
+                Just items ->
+                    generateGalleryContentData (SectionImageRoute activeSectionId) items
+                        |> GalleryContentData
+                        |> Page.GalleryPageData
+                            (makeSectionMenuData activeSectionId modelData.data)
+                        |> GalleryPage
+                        |> (\page -> ( ReadyModel <| ReadyModelData modelData.viewport modelData.key activeRoute page modelData.data, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
 
-            TagRoute _ _ ->
-                mobileUpdate
+                Nothing ->
+                    ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
 
-            TagImageRoute _ _ _ ->
-                mobileUpdate
+        SectionImageRoute activeSectionId itemId ->
+            let
+                maybeItems =
+                    findSection modelData.data activeSectionId
+                        |> Maybe.andThen (\sectionData -> getGalleryWithTagsSectionData sectionData)
+                        |> Maybe.map (\galleryWithTagsSectionData -> galleryWithTagsSectionData.items)
+            in
+            case maybeItems of
+                Just items ->
+                    generateGalleryItemContentData (SectionImageRoute activeSectionId) itemId items
+                        |> GalleryImageContentData
+                        |> Page.GalleryPageData
+                            (makeSectionMenuData activeSectionId modelData.data)
+                        |> GalleryPage
+                        |> (\page -> ( ReadyModel { modelData | route = activeRoute, page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
 
-            _ ->
-                ( mobileModelData, Cmd.batch cmdBatch )
+                Nothing ->
+                    ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
 
-    else
-        ( ReadyModel { modelData | route = route, page = routeToPage route modelData.data }, Cmd.batch cmdBatch )
+        TagRoute activeSectionId activeTagId ->
+            let
+                maybeItems =
+                    findSection modelData.data activeSectionId
+                        |> Maybe.andThen (\sectionData -> findTag activeTagId sectionData)
+                        |> Maybe.map (\tagData -> tagData.items)
+
+            in
+            case maybeItems of
+                Just items ->
+                    generateGalleryContentData (TagImageRoute activeSectionId activeTagId) items
+                        |> GalleryContentData
+                        |> Page.GalleryPageData
+                            (makeSectionMenuData activeSectionId modelData.data)
+                        |> GalleryPage
+                        |> (\page -> ( ReadyModel { modelData | route = activeRoute, page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
+
+                Nothing ->
+                    ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
+
+
+        TagImageRoute activeSectionId activeTagId itemId ->
+            let
+                maybeItems =
+                    findSection modelData.data activeSectionId
+                        |> Maybe.andThen (\sectionData -> findTag activeTagId sectionData)
+                        |> Maybe.map (\tagData -> tagData.items)
+
+            in
+            case maybeItems of
+                Just items ->
+                    generateGalleryItemContentData (SectionImageRoute activeSectionId) itemId items
+                        |> GalleryImageContentData
+                        |> Page.GalleryPageData
+                            (makeSectionMenuData activeSectionId modelData.data)
+                        |> GalleryPage
+                        |> (\page -> ( ReadyModel { modelData | route = activeRoute, page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
+
+                Nothing ->
+                    ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
+
 
 
 updateRoute oldRoute newImageId =
@@ -357,7 +427,7 @@ getSliderViewport route =
         )
 
 
-allFieldsPresent : Model -> Maybe ( Route, Model )
+allFieldsPresent : Model -> Maybe ( Route, ReadyModelData )
 allFieldsPresent newModel =
     case newModel of
         InitModel data ->
@@ -367,7 +437,7 @@ allFieldsPresent newModel =
                         route =
                             parseToRoute url appData vp
                     in
-                    ( route, InitProgressModel { data = appData, viewport = vp, key = key, route = route } )
+                    ( route, { data = appData, viewport = vp, key = key, route = route, page = InitialPage } )
                 )
                 data.data
                 data.viewport
@@ -432,9 +502,6 @@ view model =
         InitModel _ ->
             Browser.Document "** palavara **" initPage
 
-        InitProgressModel _ ->
-            Browser.Document "** palavara **" initPage
-
         InitErrorModel _ ->
             Browser.Document "** palavara **" [ text "error" ]
 
@@ -464,6 +531,8 @@ contentPage page =
 
         GalleryPage data ->
             galleryPage data
+
+        _ -> []
 
 
 startPage : Page.StartPageData -> List (Html Msg)
@@ -520,23 +589,34 @@ galleryPage data =
 
 buildPictures contentData =
     div
-        [ class "slider-window"
-        , id "slider-window"
-        ]
-        [ div
-            [ class "image-group" ]
-            (List.map
-                (\itemData ->
-                    buildSectionPicture
-                        itemData.urlString
-                        itemData.onClickMessage
-                        itemData.isActive
-                        itemData.itemId
+                [ class "image-group" ]
+                (List.map
+                    (\itemData ->
+                        buildSectionPicture
+                            itemData.urlString
+                            itemData.onClickMessage
+                            itemData.isActive
+                            itemData.itemId
+                    )
+                 <|
+                    contentData.items
                 )
-             <|
-                contentData.items
-            )
-        ]
+
+
+buildPicturesAndImage contentData =
+   div
+               [ class "image-group" ]
+               (List.map
+                   (\itemData ->
+                       buildSectionPicture
+                           itemData.urlString
+                           itemData.onClickMessage
+                           itemData.isActive
+                           itemData.itemId
+                   )
+                <|
+                   contentData.items
+               )
 
 
 buildMobilePictures contentData =
@@ -586,27 +666,24 @@ buildSectionPicture urlString onClickMessage isActive itemId =
 
 buildFullMenu : MenuData -> Html Msg
 buildFullMenu menuData =
-    div [ class "menu-wrapper" ] [
-    div [class "menu-background"] [ div [class "menu-background-inner"] [] ]
-    , div [ class "menu" ] (List.append (buildEntries menuData) [buildLogo])
-    ]
-
+    div [ class "menu-wrapper" ]
+        [ div [ class "menu-background" ] [ div [ class "menu-background-inner" ] [] ]
+        , div [ class "menu" ] (List.append (buildEntries menuData) [ buildLogo ])
+        ]
 
 
 buildEntries : MenuData -> List (Html Msg)
 buildEntries menuData =
     List.append
-        [
-        div [ class "logo-label" ] [ text "Varvara Polyakova"]
-        , div [class "menu-line"] []
+        [ div [ class "logo-label" ] [ text "Varvara Polyakova" ]
+        , div [ class "menu-line" ] []
         ]
         (List.map (\sectionData -> buildEntry sectionData) menuData)
 
 
-
 buildLogo : Html Msg
 buildLogo =
-        div [ class "logo", onClickPreventDefault <| GoToRoute Root ] [ Icons.logo  ]
+    div [ class "logo", onClickPreventDefault <| GoToRoute Root ] [ Icons.logo ]
 
 
 buildEntry : MenuSectionData -> Html Msg

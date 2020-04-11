@@ -11,6 +11,7 @@ type Page
     | InfoPage InfoPageData
     | ListPage ListPageData
     | GalleryPage GalleryPageData
+    | InitialPage
 
 
 type StartPageData
@@ -23,7 +24,6 @@ type ListPageData
 
 type GalleryPageData
     = GalleryPageData MenuData GalleryContentData
-
 
 type InfoPageData
     = InfoPageData MenuData
@@ -62,6 +62,7 @@ type alias MenuTagData =
 type GalleryContentData
     = MobileContentData MobileGalleryContentDataType
     | GalleryContentData GalleryContentDataType
+    | GalleryImageContentData GalleryImageContentDataType
 
 
 type alias MobileGalleryContentDataType =
@@ -74,8 +75,10 @@ type alias MobileGalleryContentDataType =
 
 
 type alias GalleryContentDataType =
-    { items : List ItemContentData, activeItemIndex : Int }
+    { items : List ItemContentData }
 
+type alias GalleryImageContentDataType =
+    { items : List ItemContentData, activeItemId : String }
 
 type alias ItemContentData =
     { itemId : ItemId
@@ -87,65 +90,75 @@ type alias ItemContentData =
     }
 
 
-routeToPage : Route -> AppData -> Page
-routeToPage route appData =
-    routeToPageInternal
-        generateRootMenuData
-        makeSectionMenuData
-        generateTagMenuData
-        generateSectionContentData
-        generateTagContentData
-        route
-        appData
+
+--routeToPage : Route -> AppData -> Page
+--routeToPage route appData =
+--    routeToPageInternal
+--        generateRootMenuData
+--        makeSectionMenuData
+--        generateTagMenuData
+--        (generateSectionImageContentData route)
+--        (generateTagContentData route)
+--        route
+--        appData
 
 
-routeToMobilePage : Route -> Float -> AppData -> Page
-routeToMobilePage route sliderHeight appData =
-    routeToPageInternal
-        generateMobileRootMenuData
-        generateMobileSectionMenuData
-        generateMobileTagMenuData
-        (generateMobileSectionContentData sliderHeight)
-        (generateMobileTagContentData sliderHeight)
-        route
-        appData
+--routeToMobilePage : Route -> Float -> AppData -> Page
+--routeToMobilePage route sliderHeight appData =
+--    routeToPageInternal
+--        generateMobileRootMenuData
+--        generateMobileSectionMenuData
+--        generateMobileTagMenuData
+--        (generateMobileSectionContentData route sliderHeight)
+--        (generateMobileTagContentData route sliderHeight)
+--        route
+--        appData
 
 
-routeToPageInternal rootMenuFn sectionMenuFn tagMenuFn sectionFn tagFn route appData =
-    case route of
-        Root ->
-            List.map rootMenuFn appData
-                |> StartPageData
-                |> StartPage
-
-        InfoRoute ->
-            List.map generateInfoMenuData appData
-                |> InfoPageData
-                |> InfoPage
-
-        SectionRoute activeSectionId ->
-            GalleryPageData
-                (sectionMenuFn activeSectionId appData)
-                (sectionFn activeSectionId appData zeroItemIndex (SectionImageRoute activeSectionId))
-                |> GalleryPage
-
-        TagRoute activeSectionId activeTagId ->
-            GalleryPageData
-                (tagMenuFn activeSectionId activeTagId appData)
-                (tagFn activeSectionId activeTagId appData zeroItemIndex (TagImageRoute activeSectionId activeTagId))
-                |> GalleryPage
-
-        SectionImageRoute activeSectionId imageId ->
-            GalleryPageData
-                (sectionMenuFn activeSectionId appData)
-                (sectionFn activeSectionId appData (findItemIndex imageId) (SectionImageRoute activeSectionId))
-                |> GalleryPage
-
-        TagImageRoute activeSectionId activeTagId imageId ->
-            GalleryPageData
-                (tagMenuFn activeSectionId activeTagId appData)
-                (tagFn activeSectionId activeTagId appData (findItemIndex imageId) (TagImageRoute activeSectionId activeTagId))
-                |> GalleryPage
+--routeToPageInternal rootMenuFn sectionMenuFn tagMenuFn sectionFn tagFn route appData =
+--    case route of
+--        Root ->
+--            List.map rootMenuFn appData
+--                |> StartPageData
+--                |> StartPage
+--
+--
+--        InfoRoute ->
+--            List.map generateInfoMenuData appData
+--                |> InfoPageData
+--                |> InfoPage
+--
+--
+--        SectionRoute activeSectionId ->
+--            let (finalRoute,contentData) = (sectionFn activeSectionId appData zeroItemIndex (SectionImageRoute activeSectionId))
+--            in
+--            GalleryPageData
+--                (sectionMenuFn activeSectionId appData)
+--                contentData
+--                |> GalleryPage
+--
+--
+--        TagRoute activeSectionId activeTagId ->
+--            GalleryPageData
+--                (tagMenuFn activeSectionId activeTagId appData)
+--                (tagFn activeSectionId activeTagId appData zeroItemIndex (TagImageRoute activeSectionId activeTagId))
+--                |> GalleryPage
+--
+--
+--        SectionImageRoute activeSectionId imageId ->
+--            let (finalRoute,contentData) = (sectionFn activeSectionId appData (findItemIndex imageId) (SectionImageRoute activeSectionId))
+--            in
+--            GalleryPageData
+--                (sectionMenuFn activeSectionId appData)
+--                contentData
+--                |> GalleryPage
+--
+--
+--        TagImageRoute activeSectionId activeTagId imageId ->
+--            GalleryPageData
+--                (tagMenuFn activeSectionId activeTagId appData)
+--               (tagFn activeSectionId activeTagId appData (findItemIndex imageId) (TagImageRoute activeSectionId activeTagId))
+--                |> GalleryPage
 
 
 
@@ -175,10 +188,10 @@ generateMobileRootMenuData section =
             in
             case firstItem of
                 Nothing ->
-                    generateMenuEntryData GalleryWithTags False sectionId label Root (generateMenuTagData tags sectionId)
+                    generateMenuEntryData GalleryWithTags False sectionId label Root (generateMobileMenuTagData tags sectionId)
 
                 Just { itemId } ->
-                    generateMenuEntryData GalleryWithTags False sectionId label (SectionImageRoute sectionId itemId) (generateMenuTagData tags sectionId)
+                    generateMenuEntryData GalleryWithTags False sectionId label (SectionImageRoute sectionId itemId) (generateMobileMenuTagData tags sectionId)
 
         GallerySectionType { sectionId, label } ->
             MenuSectionData Gallery sectionId label False [] (GoToRoute <| SectionRoute sectionId) (routeToUrlPath <| SectionRoute sectionId)
@@ -350,65 +363,117 @@ generateMenuTagData tags sectionId =
                 Just { itemId } ->
                     let
                         route =
+                            TagRoute sectionId tagId
+                    in
+                    MenuTagData tagId label False (GoToRoute <| route) (routeToUrlPath route)
+        )
+        tags
+
+generateMobileMenuTagData : List TagData -> SectionId -> List MenuTagData
+generateMobileMenuTagData tags sectionId =
+    List.map
+        (\{ tagId, label, items } ->
+            let
+                firstItem =
+                    getAt 0 items
+            in
+            case firstItem of
+                Nothing ->
+                    MenuTagData tagId label False (GoToRoute <| Root) (routeToUrlPath Root)
+
+                Just { itemId } ->
+                    let
+                        route =
                             TagImageRoute sectionId tagId itemId
                     in
                     MenuTagData tagId label False (GoToRoute <| route) (routeToUrlPath route)
         )
         tags
 
-
-
 ----------------
 -- SECTION CONTENT --
 
 
-generateSectionContentData : SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> GalleryContentData
-generateSectionContentData activeSectionId appData itemIndexFn nextRoute =
-    getSectionItems activeSectionId getGalleryWithTagsSectionData (generateItemContentData nextRoute itemIndexFn) appData
-        |> Maybe.withDefault { items = [], activeItemIndex = 0 }
-        |> GalleryContentData
+--generateSectionContentData : Route -> SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> GalleryContentData
+--generateSectionContentData route activeSectionId appData itemIndexFn nextRoute =
+--    getSectionItems activeSectionId getGalleryWithTagsSectionData (generateItemContentData nextRoute itemIndexFn) appData
+--        |> Maybe.withDefault { items = [] }
+--        |> GalleryContentData
+--        |> (,) route
 
 
-generateMobileSectionContentData : Float -> SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> GalleryContentData
-generateMobileSectionContentData sliderHeight activeSectionId appData itemIndexFn nextRoute =
+--generateSectionImageContentData : Route -> SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> GalleryContentData
+--generateSectionImageContentData route activeSectionId appData itemIndexFn nextRoute =
+--    let maybeData =
+--            findSection appData activeSectionId
+--               |> Maybe.andThen (\maybeSection -> getGalleryWithTagsSectionData maybeSection)
+--
+--
+--    --let (finalRoute, items) = getSectionItems activeSectionId getGalleryWithTagsSectionData (generateItemContentData nextRoute itemIndexFn) appData
+--    in
+--        GalleryImageContentData
+--        |> Tuple.pair route
+
+generateMobileSectionContentData : Route -> Float -> SectionId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> (Route, GalleryContentData)
+generateMobileSectionContentData route sliderHeight activeSectionId appData itemIndexFn nextRoute =
     getSectionItems activeSectionId getGalleryWithTagsSectionData (generateMobileItemContentData sliderHeight nextRoute itemIndexFn) appData
         |> Maybe.withDefault { items = [], activeItemIndex = 0, sliderHeight = 0, topOffset = 0, pointerStart = Nothing }
         |> MobileContentData
-
+        |> Tuple.pair route
 
 
 -- TAG CONTENT --
 
 
-generateTagContentData : SectionId -> TagId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> GalleryContentData
-generateTagContentData activeSectionId activeTagId appData itemIndexFn nextRoute =
-    getSectionItems activeSectionId (findTag activeTagId) (generateItemContentData nextRoute itemIndexFn) appData
-        |> Maybe.withDefault { items = [], activeItemIndex = 0 }
-        |> GalleryContentData
+--generateTagContentData : Route -> SectionId -> TagId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> (Route,GalleryContentData)
+--generateTagContentData route activeSectionId activeTagId appData itemIndexFn nextRoute =
+--    getSectionItems activeSectionId (findTag activeTagId) (generateGalleryItemContentData nextRoute itemIndexFn) appData
+--        |> Maybe.withDefault { items = [], activeItemIndex = 0 }
+--        |> GalleryImageContentData
+--        |> Tuple.pair route
 
 
-generateMobileTagContentData : Float -> SectionId -> TagId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> GalleryContentData
-generateMobileTagContentData sliderHeight activeSectionId activeTagId appData itemIndexFn nextRoute =
+generateMobileTagContentData : Route -> Float -> SectionId -> TagId -> AppData -> (List ItemData -> Maybe Int) -> (ItemId -> Route) -> (Route, GalleryContentData)
+generateMobileTagContentData route sliderHeight activeSectionId activeTagId appData itemIndexFn nextRoute =
     getSectionItems activeSectionId (findTag activeTagId) (generateMobileItemContentData sliderHeight nextRoute itemIndexFn) appData
         |> Maybe.withDefault { items = [], activeItemIndex = 0, sliderHeight = 0, topOffset = 0, pointerStart = Nothing }
         |> MobileContentData
+        |> Tuple.pair route
 
+generateGalleryContentData : (ItemId -> Route) -> List ItemData -> GalleryContentDataType
+generateGalleryContentData nextRoute items =
+    let
+        onClickMessage itemId =
+            GoToRoute <| nextRoute itemId
+    in
+    List.map (\{itemId, width, height } ->
+        ItemContentData
+            itemId
+            ("/img/" ++ itemId)
+            (onClickMessage itemId)
+            width
+            height
+            False
+        ) items
+    |>   GalleryContentDataType
 
-generateItemContentData : (ItemId -> Route) -> (List ItemData -> Maybe Int) -> List ItemData -> Maybe GalleryContentDataType
-generateItemContentData nextRoute itemIndexFn items =
-    (\is -> itemIndexFn is) items
-        |> Maybe.map
-            (\activeItemIndex ->
-                let
-                    onClickMessage =
-                        \itemId -> GoToRoute <| nextRoute itemId
-                in
-                indexedFoldl
-                    (generateItemContentDataInternal activeItemIndex onClickMessage)
-                    { items = [], activeItemIndex = 0 }
-                    items
-            )
+generateGalleryItemContentData : (ItemId -> Route) -> ItemId -> List ItemData -> GalleryImageContentDataType
+generateGalleryItemContentData nextRoute activeItemId items =
+    let
+        onClickMessage itemId =
+            GoToRoute <| nextRoute itemId
 
+        itemDataList =  List.map (\{itemId, width, height } ->
+                ItemContentData
+                    itemId
+                    ("/img/" ++ itemId)
+                    (onClickMessage itemId)
+                    width
+                    height
+                    (itemId == activeItemId)
+                ) items
+    in
+        GalleryImageContentDataType itemDataList activeItemId
 
 generateMobileItemContentData : Float -> (ItemId -> Route) -> (List ItemData -> Maybe Int) -> List ItemData -> Maybe MobileGalleryContentDataType
 generateMobileItemContentData sliderHeight nextRoute itemIndexFn items =

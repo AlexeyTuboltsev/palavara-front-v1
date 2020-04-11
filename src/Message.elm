@@ -9,7 +9,6 @@ import Url exposing (Url)
 
 type Msg
     = NoOp
-    | AppIsReady AppData
     | GetViewport
     | SetViewport Viewport
     | SetData (Result Http.Error AppData)
