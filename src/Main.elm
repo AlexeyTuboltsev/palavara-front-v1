@@ -13,7 +13,7 @@ import Http exposing (expectJson, get)
 import Icons
 import List.Extra exposing (getAt)
 import Message exposing (Msg(..))
-import Page exposing (GalleryContentData(..), GalleryPageData, InfoPageData, ListPageData, MenuData, MenuSectionData, MenuSectionType(..), MenuTagData, Page(..), StartPageData, calculateTopOffset, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoMenuData, generateRootMenuData,  getGalleryWithTagsSectionData, makeSectionMenuData)
+import Page exposing (GalleryContentData(..), GalleryPageData, InfoPageData, ListPageData, MenuData, MenuSectionData, MenuSectionType(..), MenuTagData, Page(..), StartPageData, calculateTopOffset, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoMenuData, generateRootMenuData, getGalleryWithTagsSectionData, makeSectionMenuData)
 import Result exposing (Result)
 import Route exposing (Route(..), parseToRoute, routeToUrlPath)
 import Task
@@ -121,8 +121,8 @@ update message model =
                         Err _ ->
                             --fixme this is a loop, goto root
                             generatePageData readyModelData route
-                            --update (GoToRoute route) newModel
 
+                        --update (GoToRoute route) newModel
                         Ok sliderHeight ->
                             --let
                             --    page =
@@ -208,8 +208,8 @@ update message model =
                                                     in
                                                     --fixme redirect should happen as a result of generateRouteAndPageData. Use sliderHeight
                                                     generatePageData readyModelData newRoute
-                                                    --( ReadyModel { readyModelData | page = newPage }, Cmd.none )
 
+                                                --( ReadyModel { readyModelData | page = newPage }, Cmd.none )
                                                 Nothing ->
                                                     ( ReadyModel readyModelData, Cmd.none )
 
@@ -263,7 +263,7 @@ generatePageData modelData activeRoute =
                         |> StartPage
                         |> Tuple.pair activeRoute
             in
-            ( ReadyModel {modelData | page = page}, Navigation.pushUrl modelData.key <| routeToUrlPath finalRoute )
+            ( ReadyModel { modelData | page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath finalRoute )
 
         InfoRoute ->
             let
@@ -273,7 +273,7 @@ generatePageData modelData activeRoute =
                         |> InfoPage
                         |> Tuple.pair activeRoute
             in
-            ( ReadyModel {modelData | page = page}, Navigation.pushUrl modelData.key <| routeToUrlPath finalRoute )
+            ( ReadyModel { modelData | page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath finalRoute )
 
         SectionRoute activeSectionId ->
             let
@@ -319,7 +319,6 @@ generatePageData modelData activeRoute =
                     findSection modelData.data activeSectionId
                         |> Maybe.andThen (\sectionData -> findTag activeTagId sectionData)
                         |> Maybe.map (\tagData -> tagData.items)
-
             in
             case maybeItems of
                 Just items ->
@@ -333,14 +332,12 @@ generatePageData modelData activeRoute =
                 Nothing ->
                     ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
 
-
         TagImageRoute activeSectionId activeTagId itemId ->
             let
                 maybeItems =
                     findSection modelData.data activeSectionId
                         |> Maybe.andThen (\sectionData -> findTag activeTagId sectionData)
                         |> Maybe.map (\tagData -> tagData.items)
-
             in
             case maybeItems of
                 Just items ->
@@ -353,7 +350,6 @@ generatePageData modelData activeRoute =
 
                 Nothing ->
                     ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
-
 
 
 updateRoute oldRoute newImageId =
@@ -532,7 +528,8 @@ contentPage page =
         GalleryPage data ->
             galleryPage data
 
-        _ -> []
+        _ ->
+            []
 
 
 startPage : Page.StartPageData -> List (Html Msg)
@@ -573,50 +570,61 @@ galleryPage data =
     case data of
         Page.GalleryPageData menuData contentData ->
             [ div [ class "layout" ]
-                [ buildFullMenu menuData
-                , case contentData of
+                (case contentData of
                     GalleryContentData desktopContentData ->
-                        buildPictures desktopContentData
+                        [ buildFullMenu menuData
+                        , buildPictures desktopContentData
+                        , div [ class "main-image off" ]
+                            [ img [ src "" ] []
+                            ]
+                        ]
 
                     GalleryImageContentData desktopContentImageData ->
-                        buildPicturesAndImage desktopContentImageData
+                        [ buildFullMenu menuData
+                        , buildPicturesAndImage desktopContentImageData
+                        , div [ class "main-image on" ]
+                            [ img [ src <| "/img/" ++ desktopContentImageData.activeItemId ] []
+                            ]
+                        ]
 
                     MobileContentData mobileContentData ->
-                        buildMobilePictures mobileContentData
-                ]
+                        [ buildFullMenu menuData
+                        , buildMobilePictures mobileContentData
+                        ]
+                )
             ]
 
 
 buildPictures contentData =
     div
-                [ class "image-group" ]
-                (List.map
-                    (\itemData ->
-                        buildSectionPicture
-                            itemData.urlString
-                            itemData.onClickMessage
-                            itemData.isActive
-                            itemData.itemId
-                    )
-                 <|
-                    contentData.items
-                )
+        [ class "image-group" ]
+        (List.map
+            (\itemData ->
+                buildSectionPicture
+                    itemData.urlString
+                    itemData.onClickMessage
+                    itemData.isActive
+                    itemData.itemId
+            )
+         <|
+            contentData.items
+        )
 
 
 buildPicturesAndImage contentData =
-   div
-               [ class "image-group" ]
-               (List.map
-                   (\itemData ->
-                       buildSectionPicture
-                           itemData.urlString
-                           itemData.onClickMessage
-                           itemData.isActive
-                           itemData.itemId
-                   )
-                <|
-                   contentData.items
-               )
+    div
+        [ class "image-group" ]
+        (List.map
+            (\itemData ->
+                buildSectionPicture
+                    itemData.urlString
+                    itemData.onClickMessage
+                    itemData.isActive
+                    itemData.itemId
+            )
+         <|
+            contentData.items
+        )
 
 
 buildMobilePictures contentData =
