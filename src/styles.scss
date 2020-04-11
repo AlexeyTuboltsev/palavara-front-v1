@@ -477,10 +477,6 @@ body {
       margin-top: 0;
       margin-bottom: 0;
     }
-
-    //@media screen and (min-width: 1024px) {
-    //  display: none;
-    //}
   }
 
   &.active-image + .image {
@@ -558,9 +554,9 @@ body {
 
 
   display: flex;
-  justify-content: center;
+  justify-content: space-around;
   align-items: center;
-  background-color: #a5a5a5;
+  background-color: #cccccc;
   transition: width 2s ease 0s;
 
   &.off {
@@ -570,8 +566,19 @@ body {
     width : 65vw;
   }
 
-  &.img {
+  & img {
 
+  }
+
+  & .prev,
+  & .next {
+    font-size: 5rem;
+    color: #000045;
+  }
+
+  & .prev.inactive,
+  & .next.inactive {
+    color: #a5a5a5;
   }
 }
 

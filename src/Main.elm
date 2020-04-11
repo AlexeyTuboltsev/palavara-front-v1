@@ -341,7 +341,7 @@ generatePageData modelData activeRoute =
             in
             case maybeItems of
                 Just items ->
-                    generateGalleryItemContentData (SectionImageRoute activeSectionId) itemId items
+                    generateGalleryItemContentData (TagImageRoute activeSectionId activeTagId) itemId items
                         |> GalleryImageContentData
                         |> Page.GalleryPageData
                             (makeSectionMenuData activeSectionId modelData.data)
@@ -581,10 +581,8 @@ galleryPage data =
 
                     GalleryImageContentData desktopContentImageData ->
                         [ buildFullMenu menuData
-                        , buildPicturesAndImage desktopContentImageData
-                        , div [ class "main-image on" ]
-                            [ img [ src <| "/img/" ++ desktopContentImageData.activeItemId ] []
-                            ]
+                        , buildPictures desktopContentImageData
+                        , buildActiveImage desktopContentImageData.activeItem
                         ]
 
                     MobileContentData mobileContentData ->
@@ -611,20 +609,28 @@ buildPictures contentData =
         )
 
 
-buildPicturesAndImage contentData =
-    div
-        [ class "image-group" ]
-        (List.map
-            (\itemData ->
-                buildSectionPicture
-                    itemData.urlString
-                    itemData.onClickMessage
-                    itemData.isActive
-                    itemData.itemId
-            )
-         <|
-            contentData.items
-        )
+buildActiveImage activeImageData =
+    let
+        prevAttributes =
+            case activeImageData.prevRoute of
+                Nothing ->
+                    [ class "prev inactive" ]
+
+                Just msg ->
+                    [ class "prev", onClickPreventDefault msg ]
+        nextAttributes =
+            case activeImageData.nextRoute of
+                Nothing ->
+                    [ class "next inactive" ]
+
+                Just msg ->
+                    [ class "next", onClickPreventDefault msg ]
+    in
+    div [ class "main-image on" ]
+        [ div prevAttributes [ text "<" ]
+        , img [ src activeImageData.urlString ] []
+        , div nextAttributes [ text ">" ]
+        ]
 
 
 buildMobilePictures contentData =

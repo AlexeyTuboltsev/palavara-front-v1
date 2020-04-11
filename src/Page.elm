@@ -78,7 +78,7 @@ type alias GalleryContentDataType =
     { items : List ItemContentData }
 
 type alias GalleryImageContentDataType =
-    { items : List ItemContentData, activeItemId : String }
+    { items : List ItemContentData, activeItem: ActiveItemContentData }
 
 type alias ItemContentData =
     { itemId : ItemId
@@ -89,6 +89,12 @@ type alias ItemContentData =
     , isActive : Bool
     }
 
+type alias ActiveItemContentData =
+    { itemId : ItemId
+    , urlString : String
+    , prevRoute: Maybe Msg
+    , nextRoute: Maybe Msg
+    }
 
 
 --routeToPage : Route -> AppData -> Page
@@ -472,8 +478,19 @@ generateGalleryItemContentData nextRoute activeItemId items =
                     height
                     (itemId == activeItemId)
                 ) items
+
+        prevOnClick = findIndex (\{itemId} -> itemId == activeItemId) items
+                    |> Maybe.andThen (\i -> getAt (i - 1)  items)
+                    |> Maybe.andThen (\{itemId} -> Just <| onClickMessage itemId)
+
+        nextOnClick = findIndex (\{itemId} -> itemId == activeItemId) items
+                    |> Maybe.andThen (\i -> getAt (i + 1)  items)
+                    |> Maybe.andThen (\{itemId} -> Just <| onClickMessage itemId)
+
+        activeItemData =
+                ActiveItemContentData activeItemId ("/img/" ++ activeItemId) prevOnClick nextOnClick
     in
-        GalleryImageContentDataType itemDataList activeItemId
+        GalleryImageContentDataType itemDataList activeItemData
 
 generateMobileItemContentData : Float -> (ItemId -> Route) -> (List ItemData -> Maybe Int) -> List ItemData -> Maybe MobileGalleryContentDataType
 generateMobileItemContentData sliderHeight nextRoute itemIndexFn items =
