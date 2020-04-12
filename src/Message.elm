@@ -16,7 +16,9 @@ type Msg
     | UrlChanged Url
     | GoToRoute Route
     | SetInitialRoute Route
-    | SetSectionRouteWithPageDimensions Route (Result Browser.Dom.Error Float)
+    | GoToRouteMobile Route (Result Browser.Dom.Error Float)
     | DownMsg ( Float, Float )
     | MoveMsg ( Float, Float )
     | UpMsg ( Float, Float )
+    | CloseMenu
+    | OpenMenu
