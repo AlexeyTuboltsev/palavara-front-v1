@@ -14,7 +14,7 @@ import Http exposing (expectJson, get)
 import Icons
 import List.Extra exposing (getAt)
 import Message exposing (Msg(..))
-import Page exposing (GalleryContentData(..), GalleryPageData, InfoPageData, ListPageData, MenuData(..), MenuSectionData, MenuSectionType(..), MenuTagData, Page(..), StartPageData, calculateTopOffset, findItemIndex, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoContentData, generateInfoMenuData, generateMobileGalleryItemContentData, generateMobileGalleryMenuData, generateMobileMenuData, generateRootMenuData, generateSectionMenuData, getGalleryWithTagsSectionData)
+import Page exposing (ActiveItemContentData, GalleryContentData(..), GalleryContentDataType, GalleryImageContentDataType, GalleryPageData, InfoPageData, ItemContentData, ListPageData, MenuData(..), MenuSectionData, MenuSectionType(..), MenuTagData, MobileGalleryContentDataType, Page(..), StartPageData, calculateTopOffset, findItemIndex, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoContentData, generateInfoMenuData, generateMobileGalleryItemContentData, generateMobileGalleryMenuData, generateMobileMenuData, generateRootMenuData, generateSectionMenuData, getGalleryWithTagsSectionData)
 import Result exposing (Result)
 import Route exposing (Route(..), parseToRoute, routeToUrlPath)
 import Task
@@ -171,10 +171,10 @@ update message model =
                             case galleryPageData of
                                 Page.GalleryPageData menuData contentData ->
                                     case contentData of
-                                        MobileContentData mobileContentData ->
+                                        MobileGalleryContentData mobileContentData ->
                                             let
                                                 newMobileContentData =
-                                                    MobileContentData { mobileContentData | pointerStart = Just ( yCoordinate, mobileContentData.topOffset ) }
+                                                    MobileGalleryContentData { mobileContentData | pointerStart = Just ( yCoordinate, mobileContentData.topOffset ) }
                                             in
                                             ( ReadyModel { readyModelData | page = GalleryPage <| Page.GalleryPageData menuData newMobileContentData }, Cmd.none )
 
@@ -190,7 +190,7 @@ update message model =
                             case galleryPageData of
                                 Page.GalleryPageData menuData contentData ->
                                     case contentData of
-                                        MobileContentData mobileContentData ->
+                                        MobileGalleryContentData mobileContentData ->
                                             case mobileContentData.pointerStart of
                                                 Just pointerStart ->
                                                     let
@@ -198,7 +198,7 @@ update message model =
                                                             calculateSliderTopOffset pointerStart mobileContentData.topOffset yCoordinate
 
                                                         newMobileContentData =
-                                                            MobileContentData { mobileContentData | pointerStart = Just pointerStart, topOffset = newTopOffset }
+                                                            MobileGalleryContentData { mobileContentData | pointerStart = Just pointerStart, topOffset = newTopOffset }
                                                     in
                                                     ( ReadyModel { readyModelData | page = GalleryPage <| Page.GalleryPageData menuData newMobileContentData }, Cmd.none )
 
@@ -217,7 +217,7 @@ update message model =
                             case galleryPageData of
                                 Page.GalleryPageData _ contentData ->
                                     case contentData of
-                                        MobileContentData mobileContentData ->
+                                        MobileGalleryContentData mobileContentData ->
                                             let
                                                 newRoute =
                                                     mobileContentData.pointerStart
@@ -411,7 +411,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                     Maybe.map2
                         (\items { itemId } ->
                             generateMobileGalleryItemContentData sliderHeight (SectionImageRoute activeSectionId) itemId 0 items
-                                |> MobileContentData
+                                |> MobileGalleryContentData
                                 |> Page.GalleryPageData
                                     (generateMobileGalleryMenuData activeSectionId modelData.data)
                                 |> GalleryPage
@@ -439,7 +439,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                     Maybe.map2
                         (\items itemIndex ->
                             generateMobileGalleryItemContentData sliderHeight (SectionImageRoute activeSectionId) itemId itemIndex items
-                                |> MobileContentData
+                                |> MobileGalleryContentData
                                 |> Page.GalleryPageData
                                     (generateMobileGalleryMenuData activeSectionId modelData.data)
                                 |> GalleryPage
@@ -467,7 +467,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                     Maybe.map2
                         (\items { itemId } ->
                             generateMobileGalleryItemContentData sliderHeight (TagImageRoute activeSectionId activeTagId) itemId 0 items
-                                |> MobileContentData
+                                |> MobileGalleryContentData
                                 |> Page.GalleryPageData
                                     (generateMobileGalleryMenuData activeSectionId modelData.data)
                                 |> GalleryPage
@@ -495,7 +495,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                     Maybe.map2
                         (\items itemIndex ->
                             generateMobileGalleryItemContentData sliderHeight (TagImageRoute activeSectionId activeTagId) itemId itemIndex items
-                                |> MobileContentData
+                                |> MobileGalleryContentData
                                 |> Page.GalleryPageData
                                     (generateMobileGalleryMenuData activeSectionId modelData.data)
                                 |> GalleryPage
@@ -509,25 +509,25 @@ generateMobilePageData modelData sliderHeight activeRoute =
                 Nothing ->
                     ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
 
-
-updateRoute oldRoute newImageId =
+updateRoute: Route -> ItemId -> Route
+updateRoute oldRoute newItemId =
     case oldRoute of
         SectionRoute _ ->
             oldRoute
 
         SectionImageRoute sectionId _ ->
-            SectionImageRoute sectionId newImageId
+            SectionImageRoute sectionId newItemId
 
         TagRoute _ _ ->
             oldRoute
 
         TagImageRoute sectionId tagId _ ->
-            TagImageRoute sectionId tagId newImageId
+            TagImageRoute sectionId tagId newItemId
 
         _ ->
             oldRoute
 
-
+calculateSliderTopOffset: (Float,Float) -> Float -> Float -> Float
 calculateSliderTopOffset pointerStart topOffset yCoordinate =
     let
         ( initialPointerStart, oldTopOffset ) =
@@ -568,18 +568,6 @@ calculateFinalSliderTopOffset sliderHeight topOffset activeItemIndex items point
 
     else
         getAt activeItemIndex items
-
-
-
---getSliderViewport route =
---    Task.attempt
---        (GoToRouteMobile route)
---        (Task.map
---            (\viewport ->
---                viewport.viewport.height
---            )
---            (getViewportOf "slider-window")
---        )
 
 
 allFieldsPresent : Model -> Maybe ( Route, ReadyModelData )
@@ -748,14 +736,14 @@ galleryPage data =
                         , buildActiveImage desktopContentImageData.activeItem
                         ]
 
-                    MobileContentData mobileContentData ->
+                    MobileGalleryContentData mobileContentData ->
                         [ buildMenu menuData
                         , buildMobilePictures mobileContentData
                         ]
                 )
             ]
 
-
+buildPictures: { x | items:  List ItemContentData} -> Html Msg
 buildPictures contentData =
     div
         [ class "image-group" ]
@@ -771,7 +759,7 @@ buildPictures contentData =
             contentData.items
         )
 
-
+buildActiveImage: ActiveItemContentData -> Html Msg
 buildActiveImage activeImageData =
     let
         prevAttributes =
@@ -796,7 +784,7 @@ buildActiveImage activeImageData =
         , div nextAttributes [ text ">" ]
         ]
 
-
+buildMobilePictures: MobileGalleryContentDataType -> Html Msg
 buildMobilePictures contentData =
     div
         [ class "slider-window"
@@ -826,7 +814,7 @@ buildMobilePictures contentData =
             )
         ]
 
-
+buildSectionPicture: String -> Msg -> Bool -> ItemId -> Html Msg
 buildSectionPicture urlString onClickMessage isActive itemId =
     a
         [ id itemId
@@ -972,10 +960,10 @@ relativePos : Pointer.Event -> ( Float, Float )
 relativePos event =
     event.pointer.offsetPos
 
-
-debugLog s x =
-    let
-        _ =
-            Debug.log s x
-    in
-    x
+--
+--debugLog s x =
+--    let
+--        _ =
+--            Debug.log s x
+--    in
+--    x

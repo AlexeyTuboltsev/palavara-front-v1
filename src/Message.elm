@@ -15,8 +15,6 @@ type Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | GoToRoute Route
-    | SetInitialRoute Route
-    | GoToRouteMobile Route (Result Browser.Dom.Error Float)
     | DownMsg ( Float, Float )
     | MoveMsg ( Float, Float )
     | UpMsg ( Float, Float )

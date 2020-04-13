@@ -29,8 +29,6 @@ routeParser data viewport =
         oneOf
             [ UrlParser.map Root top
             , UrlParser.map InfoRoute (s "info")
-
-            --, UrlParser.map DesignRoute (s "design")
             , oneOf (tagImageParserGenerator data)
             , oneOf (mobileTagParserGenerator data)
             , oneOf (sectionImageParserGenerator data)
@@ -41,8 +39,6 @@ routeParser data viewport =
         oneOf
             [ UrlParser.map Root top
             , UrlParser.map InfoRoute (s "info")
-
-            --, UrlParser.map DesignRoute (s "design")
             , oneOf (tagImageParserGenerator data)
             , oneOf (tagParserGenerator data)
             , oneOf (sectionImageParserGenerator data)
