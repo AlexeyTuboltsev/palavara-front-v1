@@ -14,11 +14,15 @@ import Http exposing (expectJson, get)
 import Icons
 import List.Extra exposing (getAt)
 import Message exposing (Msg(..))
-import Page exposing (GalleryContentData(..), GalleryPageData, InfoPageData, ListPageData, MenuData(..), MenuSectionData, MenuSectionType(..), MenuTagData, Page(..), StartPageData, calculateTopOffset, findItemIndex, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoMenuData, generateMobileGalleryItemContentData, generateMobileGalleryMenuData, generateMobileMenuData, generateRootMenuData, generateSectionMenuData, getGalleryWithTagsSectionData)
+import Page exposing (GalleryContentData(..), GalleryPageData, InfoPageData, ListPageData, MenuData(..), MenuSectionData, MenuSectionType(..), MenuTagData, Page(..), StartPageData, calculateTopOffset, findItemIndex, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoContentData, generateInfoMenuData, generateMobileGalleryItemContentData, generateMobileGalleryMenuData, generateMobileMenuData, generateRootMenuData, generateSectionMenuData, getGalleryWithTagsSectionData)
 import Result exposing (Result)
 import Route exposing (Route(..), parseToRoute, routeToUrlPath)
 import Task
 import Url exposing (Url)
+
+
+imgPath =
+    "/img/"
 
 
 type alias Flags =
@@ -131,8 +135,8 @@ update message model =
                             case galleryPageData of
                                 Page.GalleryPageData menuData contentData ->
                                     case menuData of
-                                        MobileMenuData mobileMenuData ->
-                                            MobileMenuData { mobileMenuData | menuOpen = True }
+                                        MobileTogglingMenuData mobileMenuData ->
+                                            MobileTogglingMenuData { mobileMenuData | menuOpen = True }
                                                 |> (\m -> Page.GalleryPageData m contentData)
                                                 |> GalleryPage
                                                 |> (\page -> ( ReadyModel { readyModelData | page = page }, Cmd.none ))
@@ -149,8 +153,8 @@ update message model =
                             case galleryPageData of
                                 Page.GalleryPageData menuData contentData ->
                                     case menuData of
-                                        MobileMenuData mobileMenuData ->
-                                            MobileMenuData { mobileMenuData | menuOpen = False }
+                                        MobileTogglingMenuData mobileMenuData ->
+                                            MobileTogglingMenuData { mobileMenuData | menuOpen = False }
                                                 |> (\m -> Page.GalleryPageData m contentData)
                                                 |> GalleryPage
                                                 |> (\page -> ( ReadyModel { readyModelData | page = page }, Cmd.none ))
@@ -249,14 +253,31 @@ generatePageData modelData activeRoute =
 
         InfoRoute ->
             let
-                ( finalRoute, page ) =
-                    List.map generateInfoMenuData modelData.data
-                        |> (\sd -> MenuData { menuSectionData = sd })
-                        |> Page.InfoPageData
-                        |> InfoPage
-                        |> Tuple.pair activeRoute
+                maybeRouteAndPage =
+                    findSection modelData.data "info"
+                        |> Maybe.andThen
+                            (\sd ->
+                                case sd of
+                                    InfoSectionType id ->
+                                        Just id
+
+                                    _ ->
+                                        Nothing
+                            )
+                        |> Maybe.map
+                            (\id ->
+                                generateInfoContentData id.text id.imageId
+                                    |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MenuInfoData { menuSectionData = sd }))
+                                    |> InfoPage
+                                    |> Tuple.pair activeRoute
+                            )
             in
-            ( ReadyModel { modelData | page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath finalRoute )
+            case maybeRouteAndPage of
+                Just ( route, page ) ->
+                    ( ReadyModel { modelData | page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath route )
+
+                Nothing ->
+                    ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
 
         SectionRoute activeSectionId ->
             let
@@ -342,7 +363,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
             let
                 page =
                     List.map generateMobileMenuData modelData.data
-                        |> (\sd -> MobileStartMenuData { menuSectionData = sd })
+                        |> (\sd -> MobileMenuData { menuSectionData = sd })
                         |> Page.StartPageData
                         |> StartPage
             in
@@ -350,13 +371,31 @@ generateMobilePageData modelData sliderHeight activeRoute =
 
         InfoRoute ->
             let
-                page =
-                    List.map generateInfoMenuData modelData.data
-                        |> (\sd -> MobileMenuData { menuSectionData = sd, menuOpen = False })
-                        |> Page.InfoPageData
-                        |> InfoPage
+                maybeRouteAndPage =
+                    findSection modelData.data "info"
+                        |> Maybe.andThen
+                            (\sd ->
+                                case sd of
+                                    InfoSectionType id ->
+                                        Just id
+
+                                    _ ->
+                                        Nothing
+                            )
+                        |> Maybe.map
+                            (\id ->
+                                generateInfoContentData id.text id.imageId
+                                    |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MobileTogglingMenuData { menuSectionData = sd, menuOpen = False }))
+                                    |> InfoPage
+                                    |> Tuple.pair activeRoute
+                            )
             in
-            ( ReadyModel { modelData | page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute )
+            case maybeRouteAndPage of
+                Just ( route, page ) ->
+                    ( ReadyModel { modelData | page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath route )
+
+                Nothing ->
+                    ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
 
         SectionRoute activeSectionId ->
             let
@@ -388,9 +427,6 @@ generateMobilePageData modelData sliderHeight activeRoute =
 
         SectionImageRoute activeSectionId itemId ->
             let
-                _ =
-                    Debug.log "SectionImageRoute mobile"
-
                 maybeItems =
                     findSection modelData.data activeSectionId
                         |> Maybe.andThen (\sectionData -> getGalleryWithTagsSectionData sectionData)
@@ -669,10 +705,14 @@ startPage data =
 infoPage : Page.InfoPageData -> List (Html Msg)
 infoPage data =
     case data of
-        Page.InfoPageData menuData ->
-            [ div [ class "layout" ]
-                [ div [] []
-                , buildMenu menuData
+        Page.InfoPageData menuData infoContentData ->
+            [ div [ class "layout-info" ]
+                [ buildMenu menuData
+                , div [ class "info-wrapper" ]
+                    [ div [ class "info-image" ]
+                        [ img [ src <| imgPath ++ infoContentData.imageId ] [] ]
+                    , div [ class "info-text" ] [ text infoContentData.text ]
+                    ]
                 ]
             ]
 
@@ -812,13 +852,19 @@ buildMenu menuData =
                 , div [ class "menu" ] (List.append (buildEntries menuSectionData) [ buildLogo ])
                 ]
 
-        MobileStartMenuData { menuSectionData } ->
+        MenuInfoData { menuSectionData } ->
+            div [ class "menu-wrapper" ]
+                [ div [ class "menu-background" ] [ div [ class "menu-background-inner" ] [] ]
+                , div [ class "menu" ] (List.append (buildEntries menuSectionData) [ ])
+                ]
+
+        MobileMenuData { menuSectionData } ->
             div [ class "menu-wrapper" ]
                 [ div [ class "menu-background" ] [ div [ class "menu-background-inner" ] [] ]
                 , div [ class "menu" ] (buildEntries menuSectionData)
                 ]
 
-        MobileMenuData { menuSectionData, menuOpen } ->
+        MobileTogglingMenuData { menuSectionData, menuOpen } ->
             case menuOpen of
                 True ->
                     div [ class "menu-wrapper" ]
@@ -835,7 +881,7 @@ buildMenu menuData =
                 False ->
                     div [ class "menu-wrapper" ]
                         [ div [ class "menu-background closed" ] [ div [ class "menu-background-inner" ] [] ]
-                        , div [  class "menu closed", onClickPreventDefault OpenMenu]
+                        , div [ class "menu closed", onClickPreventDefault OpenMenu ]
                             (List.append
                                 [ buildLogo
                                 , div [ class "menu-line" ] []
@@ -927,11 +973,9 @@ relativePos event =
     event.pointer.offsetPos
 
 
-
---
---debugLog s x =
---    let
---        _ =
---            Debug.log s x
---    in
---    x
+debugLog s x =
+    let
+        _ =
+            Debug.log s x
+    in
+    x

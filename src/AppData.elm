@@ -46,6 +46,8 @@ type alias GalleryWithTagsSectionData =
 type alias InfoSectionData =
     { label : String
     , sectionId : SectionId
+    , text: String
+    , imageId: String
     }
 
 
@@ -113,9 +115,11 @@ sectionDataDecoder =
                             |> JD.map GallerySectionType
 
                     "info" ->
-                        JD.map2 InfoSectionData
+                        JD.map4 InfoSectionData
                             (JD.field "label" JD.string)
                             (JD.field "sectionId" JD.string)
+                            (JD.field "text" JD.string)
+                            (JD.field "imageId" JD.string)
                             |> JD.map InfoSectionType
 
                     _ ->

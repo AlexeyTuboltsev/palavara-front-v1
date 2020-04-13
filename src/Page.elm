@@ -5,7 +5,7 @@ import List.Extra exposing (find, findIndex, getAt, indexedFoldl)
 import Message exposing (Msg(..))
 import Route exposing (Route(..), routeToUrlPath)
 
-
+imgPath = "/img/"
 type Page
     = StartPage StartPageData
     | InfoPage InfoPageData
@@ -27,13 +27,14 @@ type GalleryPageData
 
 
 type InfoPageData
-    = InfoPageData MenuData
+    = InfoPageData MenuData InfoContentData
 
 
-type MenuData =
-    MenuData {menuSectionData:List MenuSectionData}
-    | MobileStartMenuData {menuSectionData:List MenuSectionData}
-    | MobileMenuData {menuSectionData:List MenuSectionData, menuOpen: Bool}
+type MenuData
+    = MenuData { menuSectionData : List MenuSectionData }
+    | MenuInfoData { menuSectionData : List MenuSectionData }
+    | MobileMenuData { menuSectionData : List MenuSectionData }
+    | MobileTogglingMenuData { menuSectionData : List MenuSectionData, menuOpen : Bool }
 
 
 type alias MenuSectionData =
@@ -101,6 +102,12 @@ type alias ActiveItemContentData =
     , urlString : String
     , prevRoute : Maybe Msg
     , nextRoute : Maybe Msg
+    }
+
+
+type alias InfoContentData =
+    { imageId : String
+    , text : String
     }
 
 
@@ -207,32 +214,36 @@ generateMobileMenuData section =
             generateMenuEntryData Info False sectionId label InfoRoute []
 
 
-
 generateMobileGalleryMenuData : SectionId -> AppData -> MenuData
 generateMobileGalleryMenuData activeSectionId sections =
-    let bla = List.map
-            (\section ->
-                case section of
-                    GalleryWithTagsSectionType { sectionId, label, tags, items } ->
-                        let
-                            firstItem =
-                                getAt 0 items
-                        in
-                        case firstItem of
-                            Nothing ->
-                                generateMenuEntryData GalleryWithTags (activeSectionId == sectionId) sectionId label Root (generateMobileMenuTagData tags sectionId)
+    let
+        bla =
+            List.map
+                (\section ->
+                    case section of
+                        GalleryWithTagsSectionType { sectionId, label, tags, items } ->
+                            let
+                                firstItem =
+                                    getAt 0 items
+                            in
+                            case firstItem of
+                                Nothing ->
+                                    generateMenuEntryData GalleryWithTags (activeSectionId == sectionId) sectionId label Root (generateMobileMenuTagData tags sectionId)
 
-                            Just { itemId } ->
-                                generateMenuEntryData GalleryWithTags (activeSectionId == sectionId) sectionId label (SectionImageRoute sectionId itemId) (generateMobileMenuTagData tags sectionId)
+                                Just { itemId } ->
+                                    generateMenuEntryData GalleryWithTags (activeSectionId == sectionId) sectionId label (SectionImageRoute sectionId itemId) (generateMobileMenuTagData tags sectionId)
 
-                    GallerySectionType { sectionId, label } ->
-                        MenuSectionData Gallery sectionId label (activeSectionId == sectionId) [] (GoToRoute <| SectionRoute sectionId) (routeToUrlPath <| SectionRoute sectionId)
+                        GallerySectionType { sectionId, label } ->
+                            MenuSectionData Gallery sectionId label (activeSectionId == sectionId) [] (GoToRoute <| SectionRoute sectionId) (routeToUrlPath <| SectionRoute sectionId)
 
-                    InfoSectionType { sectionId, label } ->
-                        generateMenuEntryData Info (activeSectionId == sectionId) sectionId label InfoRoute []
-            ) sections
+                        InfoSectionType { sectionId, label } ->
+                            generateMenuEntryData Info (activeSectionId == sectionId) sectionId label InfoRoute []
+                )
+                sections
     in
-    MobileMenuData {menuSectionData=bla, menuOpen= False}
+    MobileTogglingMenuData { menuSectionData = bla, menuOpen = False }
+
+
 
 -- INFO MENU --
 
@@ -257,6 +268,7 @@ generateInfoMenuData section =
 generateSectionMenuData : SectionId -> List SectionData -> MenuData
 generateSectionMenuData activeSectionId sections =
     generateSectionMenuDataInternal activeSectionId sections generateMenuTagData
+
 
 
 --generateMobileSectionMenuData : SectionId -> List SectionData -> MenuData
@@ -296,7 +308,8 @@ generateSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
                     MenuSectionData Gallery sectionId label False [] NoOp ""
         )
         sections
-        |> (\s -> MenuData {menuSectionData = s})
+        |> (\s -> MenuData { menuSectionData = s })
+
 
 
 --generateMenuTagDataWithActiveTag : TagId -> List TagData -> SectionId -> List MenuTagData
@@ -321,8 +334,6 @@ generateSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
 --            MenuTagData tagId label tagIsActive onClickMessage urlString
 --        )
 --        tags
-
-
 --generateMobileMenuTagDataWithActiveTag : TagId -> List TagData -> SectionId -> List MenuTagData
 --generateMobileMenuTagDataWithActiveTag activeTagId tags sectionId =
 --    List.map
@@ -353,9 +364,6 @@ generateSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
 --            MenuTagData tagId label tagIsActive onClickMessage urlString
 --        )
 --        tags
-
-
-
 -- MENU ENTRY --
 
 
@@ -442,7 +450,7 @@ generateGalleryContentData nextRoute items =
         (\{ itemId, width, height } ->
             ItemContentData
                 itemId
-                ("/img/" ++ itemId)
+                (imgPath ++ itemId)
                 (onClickMessage itemId)
                 width
                 height
@@ -463,7 +471,7 @@ generateGalleryItemContentData nextRoute activeItemId items =
                 (\{ itemId, width, height } ->
                     ItemContentData
                         itemId
-                        ("/img/" ++ itemId)
+                        (imgPath ++ itemId)
                         (onClickMessage itemId)
                         width
                         height
@@ -492,7 +500,9 @@ generateMobileGalleryItemContentData sliderHeight nextRoute activeItemId activeI
     let
         onClickMessage itemId =
             case itemId == activeItemId of
-                True -> NoOp
+                True ->
+                    NoOp
+
                 False ->
                     GoToRoute <| nextRoute itemId
 
@@ -504,7 +514,7 @@ generateMobileGalleryItemContentData sliderHeight nextRoute activeItemId activeI
                 (\{ itemId, width, height } ->
                     ItemContentData
                         itemId
-                        ("/img/" ++ itemId)
+                        (imgPath ++ itemId)
                         (onClickMessage itemId)
                         width
                         height
@@ -513,6 +523,11 @@ generateMobileGalleryItemContentData sliderHeight nextRoute activeItemId activeI
                 items
     in
     MobileGalleryContentDataType itemDataList activeItemIndex sliderHeight topOffset Nothing False
+
+
+generateInfoContentData : String -> String -> InfoContentData
+generateInfoContentData text imageId =
+    InfoContentData imageId text
 
 
 
@@ -569,28 +584,23 @@ generateMobileGalleryItemContentData sliderHeight nextRoute activeItemId activeI
 --                    { items = [], activeItemIndex = 0, sliderHeight = sliderHeight, topOffset = topOffset, pointerStart = Nothing }
 --                    items
 --            )
-
-
-generateItemContentDataInternal : Int -> (ItemId -> Msg) -> (Int -> ItemData -> { x | items : List ItemContentData, activeItemIndex : Int } -> { x | items : List ItemContentData, activeItemIndex : Int })
-generateItemContentDataInternal activeItemIndex onClickMessage =
-    \i { itemId, width, height } acc ->
-        { acc
-            | items =
-                List.append
-                    acc.items
-                    [ ItemContentData
-                        itemId
-                        ("/img/" ++ itemId)
-                        (onClickMessage itemId)
-                        width
-                        height
-                        (activeItemIndex == i)
-                    ]
-            , activeItemIndex = activeItemIndex
-        }
-
-
-
+--generateItemContentDataInternal : Int -> (ItemId -> Msg) -> (Int -> ItemData -> { x | items : List ItemContentData, activeItemIndex : Int } -> { x | items : List ItemContentData, activeItemIndex : Int })
+--generateItemContentDataInternal activeItemIndex onClickMessage =
+--    \i { itemId, width, height } acc ->
+--        { acc
+--            | items =
+--                List.append
+--                    acc.items
+--                    [ ItemContentData
+--                        itemId
+--                        (imgPath ++ itemId)
+--                        (onClickMessage itemId)
+--                        width
+--                        height
+--                        (activeItemIndex == i)
+--                    ]
+--            , activeItemIndex = activeItemIndex
+--        }
 -- UTILS --
 
 
@@ -599,18 +609,19 @@ isSectionActive sectionId activeSectionId =
     sectionId == activeSectionId
 
 
-isTagActive : TagId -> TagId -> Bool
-isTagActive tagId activeTagId =
-    tagId == activeTagId
 
-
-getSectionItems : SectionId -> (SectionData -> Maybe { a | items : List ItemData }) -> (List ItemData -> Maybe y) -> AppData -> Maybe y
-getSectionItems activeSectionId sectionFn itemsFn appData =
-    findSection appData activeSectionId
-        |> Maybe.andThen
-            (\section -> sectionFn section)
-        |> Maybe.andThen
-            (\{ items } -> itemsFn items)
+--isTagActive : TagId -> TagId -> Bool
+--isTagActive tagId activeTagId =
+--    tagId == activeTagId
+--
+--
+--getSectionItems : SectionId -> (SectionData -> Maybe { a | items : List ItemData }) -> (List ItemData -> Maybe y) -> AppData -> Maybe y
+--getSectionItems activeSectionId sectionFn itemsFn appData =
+--    findSection appData activeSectionId
+--        |> Maybe.andThen
+--            (\section -> sectionFn section)
+--        |> Maybe.andThen
+--            (\{ items } -> itemsFn items)
 
 
 findSection : List SectionData -> SectionId -> Maybe SectionData
@@ -619,6 +630,9 @@ findSection sectionList sectionId =
         (\section ->
             case section of
                 GalleryWithTagsSectionType data ->
+                    data.sectionId == sectionId
+
+                InfoSectionType data ->
                     data.sectionId == sectionId
 
                 _ ->
