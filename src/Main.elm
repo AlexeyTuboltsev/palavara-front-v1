@@ -933,11 +933,11 @@ buildTags tagDataList =
     List.map (\tagData -> buildTag tagData) tagDataList
         |> List.intersperse
             (span [ class "pipe" ]
-                [ text "\u{00A0}\u{00A0}"
-                , text "|"
-                , text " \u{00A0}"
+                [ text "|"
+
                 ]
             )
+            |> List.intersperse (text " \u{00A0}")
 
 
 buildTag : MenuTagData -> Html Msg
