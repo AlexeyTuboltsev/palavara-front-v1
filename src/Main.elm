@@ -11,7 +11,7 @@ import Html.Attributes exposing (class, href, id, src, style)
 import Html.Events.Extra exposing (onClickPreventDefault)
 import Html.Events.Extra.Pointer as Pointer
 import Http exposing (expectJson, get)
-import Icons
+import Icons exposing (logo, minus, plus)
 import List.Extra exposing (find, getAt)
 import Message exposing (Msg(..))
 import Page exposing (ActiveItemContentData, GalleryContentData(..), GalleryContentDataType, GalleryImageContentDataType, GalleryPageData, InfoPageData, ItemContentData, ListPageData, MenuData(..), MenuSectionData, MenuSectionType(..), MenuTagData, MobileGalleryContentDataType, Page(..), StartPageData, calculateTopOffset, findItemIndex, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoContentData, generateInfoMenuData, generateMobileGalleryItemContentData, generateMobileGalleryMenuData, generateMobileMenuData, generateRootMenuData, generateSectionMenuData, getGalleryWithTagsSectionData)
@@ -54,7 +54,7 @@ type alias InProgressModelData =
 
 type alias InitModelData =
     { url : Url
-    , dataUrl: String
+    , dataUrl : String
     , key : Navigation.Key
     , data : Maybe AppData
     , viewport : Maybe Viewport
@@ -79,8 +79,6 @@ update message model =
                 SetData result ->
                     case result of
                         Err err ->
-                            let _ = Debug.log "err" err
-                            in
                             ( InitErrorModel err, Cmd.none )
 
                         Ok data ->
@@ -298,7 +296,7 @@ generatePageData modelData activeRoute =
                         |> Page.GalleryPageData
                             (generateSectionMenuData activeSectionId modelData.data)
                         |> GalleryPage
-                        |> (\page -> ( ReadyModel <| ReadyModelData modelData.viewport modelData.key modelData.apiUrl  activeRoute page modelData.data, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
+                        |> (\page -> ( ReadyModel <| ReadyModelData modelData.viewport modelData.key modelData.apiUrl activeRoute page modelData.data, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
 
                 Nothing ->
                     ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
@@ -315,13 +313,13 @@ generatePageData modelData activeRoute =
                         |> Maybe.andThen (\items -> find (\item -> item.itemId == itemId) items)
 
                 maybeRouteAndBla =
-                   Maybe.map2
-                      (\items activeItem -> (items, activeItem)) maybeItems maybeActiveItem
-
-
+                    Maybe.map2
+                        (\items activeItem -> ( items, activeItem ))
+                        maybeItems
+                        maybeActiveItem
             in
             case maybeRouteAndBla of
-                Just (items, activeItem) ->
+                Just ( items, activeItem ) ->
                     generateGalleryItemContentData modelData.apiUrl (SectionImageRoute activeSectionId) activeItem items
                         |> GalleryImageContentData
                         |> Page.GalleryPageData
@@ -363,11 +361,13 @@ generatePageData modelData activeRoute =
                         |> Maybe.andThen (\items -> find (\item -> item.itemId == itemId) items)
 
                 maybeRouteAndBla =
-                   Maybe.map2
-                      (\items activeItem -> (items, activeItem)) maybeItems maybeActiveItem
+                    Maybe.map2
+                        (\items activeItem -> ( items, activeItem ))
+                        maybeItems
+                        maybeActiveItem
             in
             case maybeRouteAndBla of
-                Just (items, activeItem) ->
+                Just ( items, activeItem ) ->
                     generateGalleryItemContentData modelData.apiUrl (TagImageRoute activeSectionId activeTagId) activeItem items
                         |> GalleryImageContentData
                         |> Page.GalleryPageData
@@ -532,7 +532,8 @@ generateMobilePageData modelData sliderHeight activeRoute =
                 Nothing ->
                     ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
 
-updateRoute: Route -> ItemId -> Route
+
+updateRoute : Route -> ItemId -> Route
 updateRoute oldRoute newItemId =
     case oldRoute of
         SectionRoute _ ->
@@ -550,7 +551,8 @@ updateRoute oldRoute newItemId =
         _ ->
             oldRoute
 
-calculateSliderTopOffset: (Float,Float) -> Float -> Float -> Float
+
+calculateSliderTopOffset : ( Float, Float ) -> Float -> Float -> Float
 calculateSliderTopOffset pointerStart topOffset yCoordinate =
     let
         ( initialPointerStart, oldTopOffset ) =
@@ -603,7 +605,7 @@ allFieldsPresent newModel =
                         route =
                             parseToRoute url appData vp
                     in
-                    ( route, { data = appData, apiUrl = urlString,viewport = vp, key = key, route = route, page = InitialPage } )
+                    ( route, { data = appData, apiUrl = urlString, viewport = vp, key = key, route = route, page = InitialPage } )
                 )
                 data.data
                 data.viewport
@@ -632,12 +634,13 @@ main =
 
 init : Flags -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init { apiBaseUrl, dataPath, imagePath, apiPort, apiProtocol } url key =
-    let baseUrl =
-          apiProtocol
-            ++ "://"
-            ++ apiBaseUrl
-            ++ apiPort
-            ++ "/"
+    let
+        baseUrl =
+            apiProtocol
+                ++ "://"
+                ++ apiBaseUrl
+                ++ apiPort
+                ++ "/"
     in
     ( InitModel (InitModelData url (baseUrl ++ imagePath ++ "/") key Nothing Nothing)
     , Cmd.batch
@@ -763,7 +766,8 @@ galleryPage data =
                 )
             ]
 
-buildPictures: { x | items:  List ItemContentData} -> Html Msg
+
+buildPictures : { x | items : List ItemContentData } -> Html Msg
 buildPictures contentData =
     div
         [ class "image-group" ]
@@ -779,7 +783,8 @@ buildPictures contentData =
             contentData.items
         )
 
-buildActiveImage: ActiveItemContentData -> Html Msg
+
+buildActiveImage : ActiveItemContentData -> Html Msg
 buildActiveImage activeImageData =
     let
         prevAttributes =
@@ -799,12 +804,13 @@ buildActiveImage activeImageData =
                     [ class "next", onClickPreventDefault msg ]
     in
     div [ class "main-image on" ]
-        [ div prevAttributes [ text "<" ]
+        [ div prevAttributes [ minus ]
         , img [ src activeImageData.urlString ] []
-        , div nextAttributes [ text ">" ]
+        , div nextAttributes [ plus ]
         ]
 
-buildMobilePictures: MobileGalleryContentDataType -> Html Msg
+
+buildMobilePictures : MobileGalleryContentDataType -> Html Msg
 buildMobilePictures contentData =
     div
         [ class "slider-window"
@@ -834,7 +840,8 @@ buildMobilePictures contentData =
             )
         ]
 
-buildSectionPicture: String -> Msg -> Bool -> ItemId -> Html Msg
+
+buildSectionPicture : String -> Msg -> Bool -> ItemId -> Html Msg
 buildSectionPicture urlString onClickMessage isActive itemId =
     a
         [ id itemId
@@ -863,7 +870,7 @@ buildMenu menuData =
         MenuInfoData { menuSectionData } ->
             div [ class "menu-wrapper" ]
                 [ div [ class "menu-background" ] [ div [ class "menu-background-inner" ] [] ]
-                , div [ class "menu" ] (List.append (buildEntries menuSectionData) [ ])
+                , div [ class "menu" ] (List.append (buildEntries menuSectionData) [])
                 ]
 
         MobileMenuData { menuSectionData } ->
@@ -954,10 +961,9 @@ buildTags tagDataList =
         |> List.intersperse
             (span [ class "pipe" ]
                 [ text "|"
-
                 ]
             )
-            |> List.intersperse (text " \u{00A0}")
+        |> List.intersperse (text " \u{00A0}")
 
 
 buildTag : MenuTagData -> Html Msg
@@ -979,6 +985,8 @@ buildTag tagData =
 relativePos : Pointer.Event -> ( Float, Float )
 relativePos event =
     event.pointer.offsetPos
+
+
 
 --
 --debugLog s x =

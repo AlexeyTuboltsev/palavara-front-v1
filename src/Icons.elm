@@ -17,13 +17,13 @@ logo =
 
 
 plus =
-    svg [ width "49px", height "49px", viewBox "0 0 49 49" ]
-        [ Svg.line [ fill "none", strokeMiterlimit "10", strokeWidth "0.5", x1 "24", y1 "0.5", x2 "24", y2 "48.5" ] []
-        , Svg.line [ fill "none", strokeMiterlimit "10", strokeWidth "0.5", x1 "48.5", y1 "25", x2 "0.5", y2 "25" ] []
+    svg [  x "0px", y "0px", height "100%", viewBox "0 0 49 49" ]
+        [ Svg.line [ fill "none", strokeMiterlimit "10", x1 "24", y1 "0.5", x2 "24", y2 "48.5" ] []
+        , Svg.line [ fill "none", strokeMiterlimit "10", x1 "48.5", y1 "25", x2 "0.5", y2 "25" ] []
         ]
 
 
 minus =
-    svg [ width "49px", height "49px", viewBox "0 0 49 49" ]
-        [ Svg.line [ fill "none", strokeMiterlimit "10", strokeWidth "0.5", x1 "48.5", y1 "25", x2 "0.5", y2 "25" ] []
+    svg [  x "0px", y "0px", height "100%", viewBox "0 0 49 49" ]
+        [ Svg.line [ fill "none", strokeMiterlimit "10", x1 "48.5", y1 "25", x2 "0.5", y2 "25" ] []
         ]

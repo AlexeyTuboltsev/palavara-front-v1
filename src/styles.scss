@@ -4,18 +4,20 @@ $screen-height: 100vh;
 $line-height: 144%;
 
 $color-canvas: #ffffff;
-$color-light-gray: #cccccc;
-$color-gray: #868788;
 $color-black: #000000;
+$color-light-gray: #f5f6f6;
+$color-gray: #868788;
 $color-blue: #000045;
-$color-yellow: yellow;
+$color-yellow: #ffff00;
 
-$menu-width: 42rem;
-$margin: 3.4rem;
-$margin-small: 3rem;
+$menu-width-mobile: 21rem;
+$menu-width-desktop: 22rem;
+$menu-inner-margin: 2.4rem;
+$margin: 1.8rem;
+$margin-small: 1.4rem;
 $start-background-image: "../public/img/0.jpg";
-$logo-label-height: 2.5rem;
-$text-size: 2.9rem;
+$logo-label-height: 1.25rem;
+$text-size: 1.45rem;
 
 :root {
   --image-height: calc((100vh - #{$top-bar-height}) * 0.7);
@@ -127,7 +129,7 @@ body {
   @media screen and (min-width: 1024px) {
     position: relative;
     grid-column: 1 /span 2;
-    padding: 0;
+    padding: 0 $margin-small 0 $margin-small;
     width: 100%;
   }
 }
@@ -139,17 +141,19 @@ body {
 
   background-color: transparent;
   height: 100%;
-  width: $menu-width;
+  width: $menu-width-mobile;
 
   margin: 0 0 0 $margin-small;
+  transition-property: height;
+  transition-duration: 0.5s;
 
   @media screen and (min-width: 1024px) {
-    width: 40rem;
-    padding: 2.7rem 0 2.7rem 0;
+    width: $menu-width-desktop;
+    padding: 2.7rem 0 0 0;
   }
 
   &.closed {
-    height: calc(#{$margin} + #{$margin} + 2.5rem);
+    height: calc(#{$margin} + #{$margin} + 1.5rem);
   }
 
   .menu-background-inner {
@@ -163,7 +167,7 @@ body {
 .menu {
   position: sticky;
   display: grid;
-  grid-template: calc(#{$margin} + #{$logo-label-height}) 5.5rem 1fr / #{$menu-width} 1fr;
+  grid-template: calc(#{$margin} + #{$logo-label-height}) #{$menu-inner-margin} 1fr / #{$menu-width-mobile} 1fr;
   grid-auto-flow: row;
   height: auto;
   align-items: start;
@@ -175,8 +179,8 @@ body {
   background-color: transparent;
 
   @media screen and (min-width: 1024px) {
-    grid-template: 1fr 0.53px auto/40rem 1fr;
-    padding: 2.7rem 0;
+    grid-template: 1fr 0.53px auto/#{$menu-width-desktop} 1fr;
+    padding: 2.7rem 0 0 0;
   }
 
   &.closed {
@@ -201,27 +205,30 @@ body {
     grid-column: 1;
     grid-row: 1 / span 3;
     justify-self: flex-start;
-    margin-left: 3rem;
+    margin-left: 2rem;
 
     display: flex;
     justify-content: center;
     align-items: center;
 
-    width: 8.2rem;
-    height: 8.2rem;
+    width: 4.4rem;
+    height: 4.4rem;
 
     border: 1px solid #000045;
-    border-radius: 4.1rem;
+    border-radius: 2.2rem;
 
     @media screen and (min-width: 1024px) {
       grid-column: 2;
       grid-row: 3 /span 3;
       justify-self: flex-end;
+      margin-top: 1rem;
+      align-self: flex-start;
+
     }
 
     svg {
-      height: 6rem;
-      width: 6rem;
+      height: 3.2rem;
+      width: 3.2rem;
       fill: $color-blue;
     }
   }
@@ -229,7 +236,7 @@ body {
   .menu-line {
     height: 1px;
     width: calc(100% - #{$margin});
-    background-color: $color-black;
+    background-color: $color-blue;
     grid-column: 2;
     grid-row: 2;
     margin-left: $margin;
@@ -271,9 +278,9 @@ body {
     align-self: flex-start;
     display: block;
     font-weight: 400;
-    font-size: 2.4rem;
-    color: $color-black;
-    margin-top: 1rem;
+    font-size: $text-size;
+    color: $color-blue;
+    margin-top: 0.5rem;
   }
 
   .menu-entry.info {
@@ -293,7 +300,7 @@ body {
     margin: 0 0 auto 0;
     line-height: 80%;
     padding: 0;
-    color: $color-black;
+    color: $color-blue;
     text-transform: none;
   }
 }
@@ -302,7 +309,7 @@ body {
 .pipe {
   font-weight: 300;
   font-size: $text-size;
-  margin: 0.9rem 0.5rem 0 0.5rem;
+  margin: 0.5rem 0 0 0;
   line-height: 1;
 }
 
@@ -314,6 +321,12 @@ body {
   height: 100vh;
   background-color: $color-yellow;
 
+  @media screen and (min-width: 1024px) {
+    grid-template: auto 1fr/ #{$menu-width-desktop} 1fr;
+    background-color: transparent;
+  }
+
+
   .image-start {
     grid-column: 1;
     grid-row: 2;
@@ -323,36 +336,45 @@ body {
 
     background: center center url(#{$start-background-image}) no-repeat;
     background-size: cover;
+
+    @media screen and (min-width: 1024px) {
+      grid-column: 2;
+    }
+
   }
 
   .menu-wrapper {
-    position: relative;
     z-index: 0;
-
     width: 100%;
+    background-color: $color-yellow;
   }
 
   .menu-background {
     padding: $margin 0 calc(#{$margin} + .3rem) 0;
 
     @media screen and (min-width: 1024px) {
-      left: 2.7rem;
-      padding-left: 0;
+      padding: $margin 0 0 #{$margin-small};
+      margin: 0
     }
   }
 
   .menu-background-inner {
     background-color: white;
+
+    @media screen and (min-width: 1024px) {
+      background-color: transparent;
+    }
   }
 
   .menu {
     position: sticky;
-    grid-template: calc(#{$margin} + #{$logo-label-height}) 5.5rem / #{$menu-width} 1fr;
+    grid-template: calc(#{$margin} + #{$logo-label-height}) #{$menu-inner-margin} / #{$menu-width-mobile} 1fr;
 
     padding-bottom: $margin;
 
     @media screen and (min-width: 1024px) {
-      grid-template: 1fr 0.53px auto/40rem 1fr;
+      grid-template: 1fr 0.53px auto/#{$menu-width-desktop} 1fr;
+      padding-bottom: 0;
     }
 
     .menu-line {
@@ -379,6 +401,10 @@ body {
 
   .logo {
     align-self: center;
+
+    @media screen and (min-width: 1024px) {
+      align-self: flex-start;
+    }
   }
 }
 
@@ -519,14 +545,15 @@ body {
     position: initial;
     width: 100%;
     display: grid;
-    grid-template: 15rem / repeat(auto-fill,14vw);
+    grid-template: 15rem / repeat(auto-fill,minmax(8vw, 1fr));
     grid-auto-rows: 15rem;
     grid-auto-columns: 10vw;
     grid-auto-flow: dense;
     grid-column-gap: 1vw;
-    grid-row-gap: 8rem;
+    grid-row-gap: 1vw;
     overflow: scroll;
 
+    padding: $margin;
     .image {
       opacity: 1;
       transition: none;
@@ -538,34 +565,49 @@ body {
   grid-row: 1 / span 2;
   grid-column: 2;
 
-  display: flex;
-  justify-content: space-around;
+  display: grid;
+  grid-template: 1fr /7% 1fr 7% ;
+  justify-items: center;
   align-items: center;
-  background-color: #cccccc;
-  transition: width 2s ease 0s;
   height: 100vh;
+  padding: $margin $margin-small;
+
+  background-color: $color-light-gray;
+  transition: width 2s ease 0s;
 
   &.off {
     width: 0;
   }
 
   &.on {
-    width: 65vw;
+    width: calc(100vw - #{$menu-width-desktop} - 2* #{$margin-small});
   }
 
   & img {
     max-width: 100%;
+    max-height: 80%;
+    object-fit: contain;
   }
 
   & .prev,
   & .next {
-    font-size: 5rem;
-    color: #000045;
+    cursor: pointer;
+
+    svg{
+      width: 4rem;
+      height: 4rem;
+      stroke: $color-blue;
+      stroke-width: 1px;
+    }
   }
 
   & .prev.inactive,
   & .next.inactive {
-    color: #a5a5a5;
+    cursor: default;
+
+    svg{
+      stroke: $color-gray;
+    }
   }
 }
 
@@ -580,15 +622,70 @@ body {
   background-color: $color-yellow;
   overflow: hidden;
 
+  @media screen and (min-width: 1024px) {
+    grid-template: 6rem auto 1fr / 1fr;
+    padding: 0;
+    position: relative;
+
+    .menu-wrapper {
+      grid-column: 1 /span 3;
+      grid-row: 1 / span 2;
+    }
+
+    .menu-background {
+      padding-left: $margin;
+      padding-right: $margin;
+      width: 100%;
+      margin: 0;
+
+      .menu-background-inner {
+        background-color: white;
+      }
+    }
+
+    .menu {
+      position: relative;
+      column-gap: 0;
+    }
+  }
+
+
   .info-wrapper {
     background-color: white;
     grid-row: 2;
+
+    height: 100%;
+    overflow: hidden;
+
+    @media screen and (min-width: 1024px) {
+      grid-column: 2;
+      grid-row: 2 / span 2;
+      display: grid;
+      grid-template: 1fr / 1fr auto;
+      background-color: transparent;
+      padding-right: $margin;
+      z-index: 2;
+    }
   }
 
   .info-text {
-    margin: 1rem;
     font-size: 1.6rem;
     overflow-wrap: anywhere;
+    word-break: break-word;
+
+    height: 100%;
+    overflow: scroll;
+    padding: 1rem 1rem 2rem 1rem;
+
+    @media screen and (min-width: 1024px) {
+      z-index: 1;
+      grid-column: 1;
+      grid-row: 1;
+      margin: 0;
+      padding: 0;
+      font-size: 1.6rem;
+      max-width: 40rem;
+    }
   }
 
   .info-image {
@@ -598,47 +695,9 @@ body {
     img {
       width: 100%
     }
-  }
 
-  @media screen and (min-width: 1024px) {
-    grid-template: 6rem auto / 40rem 1fr;
-    padding: 2.7rem 2.7rem 0 2.7rem;
-    position: relative;
-
-    .menu-wrapper {
-      grid-column: 1 /span 3;
-      grid-row: 1 / span 2;
-    }
-
-    .menu-background {
-      display: none;
-    }
-
-    .menu {
-      position: relative;
-      background-color: white;
-      column-gap: 0;
-    }
-
-    .info-wrapper {
-      grid-column: 2;
-      display: grid;
-      grid-template: 1fr / 1fr auto;
-      background-color: transparent;
-    }
-
-    .info-text {
+    @media screen and (min-width: 1024px) {
       z-index: 1;
-      grid-column: 1;
-      grid-row: 1;
-      margin: 1rem 1rem auto 1rem;
-      font-size: 1.6rem;
-      max-width: 40rem;
-    }
-
-    .info-image {
-      z-index: 1;
-      margin-top: 1rem;
       margin-left: 5rem;
       width: 17rem;
     }
