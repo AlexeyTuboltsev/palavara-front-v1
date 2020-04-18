@@ -1,8 +1,9 @@
 module.exports = {
   ELM_CONFIG: {
-    pictureBaseUrl: "'/img/'",
-    dataApiUrl: "'localhost:3061'",
-    dataApiPath: "'data'",
-    protocol: "'https'"
+    apiBaseUrl: "'data.palavara.com'",
+    apiProtocol: "'https'",
+    apiPort: "''",
+    dataPath: "'data'",
+    imagePath: "'img'"
   }
 }

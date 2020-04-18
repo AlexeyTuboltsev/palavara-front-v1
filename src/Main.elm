@@ -12,7 +12,7 @@ import Html.Events.Extra exposing (onClickPreventDefault)
 import Html.Events.Extra.Pointer as Pointer
 import Http exposing (expectJson, get)
 import Icons
-import List.Extra exposing (getAt)
+import List.Extra exposing (find, getAt)
 import Message exposing (Msg(..))
 import Page exposing (ActiveItemContentData, GalleryContentData(..), GalleryContentDataType, GalleryImageContentDataType, GalleryPageData, InfoPageData, ItemContentData, ListPageData, MenuData(..), MenuSectionData, MenuSectionType(..), MenuTagData, MobileGalleryContentDataType, Page(..), StartPageData, calculateTopOffset, findItemIndex, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoContentData, generateInfoMenuData, generateMobileGalleryItemContentData, generateMobileGalleryMenuData, generateMobileMenuData, generateRootMenuData, generateSectionMenuData, getGalleryWithTagsSectionData)
 import Result exposing (Result)
@@ -29,13 +29,15 @@ type alias Flags =
     { apiBaseUrl : String
     , apiProtocol : String
     , apiPort : String
-    , apiUrl : String
+    , dataPath : String
+    , imagePath : String
     }
 
 
 type alias ReadyModelData =
     { viewport : Viewport
     , key : Navigation.Key
+    , apiUrl : String
     , route : Route
     , page : Page
     , data : AppData
@@ -52,6 +54,7 @@ type alias InProgressModelData =
 
 type alias InitModelData =
     { url : Url
+    , dataUrl: String
     , key : Navigation.Key
     , data : Maybe AppData
     , viewport : Maybe Viewport
@@ -76,6 +79,8 @@ update message model =
                 SetData result ->
                     case result of
                         Err err ->
+                            let _ = Debug.log "err" err
+                            in
                             ( InitErrorModel err, Cmd.none )
 
                         Ok data ->
@@ -266,7 +271,7 @@ generatePageData modelData activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text id.imageId
+                                generateInfoContentData id.text modelData.apiUrl id.imageId
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MenuInfoData { menuSectionData = sd }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -288,12 +293,12 @@ generatePageData modelData activeRoute =
             in
             case maybeItems of
                 Just items ->
-                    generateGalleryContentData (SectionImageRoute activeSectionId) items
+                    generateGalleryContentData modelData.apiUrl (SectionImageRoute activeSectionId) items
                         |> GalleryContentData
                         |> Page.GalleryPageData
                             (generateSectionMenuData activeSectionId modelData.data)
                         |> GalleryPage
-                        |> (\page -> ( ReadyModel <| ReadyModelData modelData.viewport modelData.key activeRoute page modelData.data, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
+                        |> (\page -> ( ReadyModel <| ReadyModelData modelData.viewport modelData.key modelData.apiUrl  activeRoute page modelData.data, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
 
                 Nothing ->
                     ( ReadyModel modelData, Navigation.pushUrl modelData.key <| routeToUrlPath Root )
@@ -304,10 +309,20 @@ generatePageData modelData activeRoute =
                     findSection modelData.data activeSectionId
                         |> Maybe.andThen (\sectionData -> getGalleryWithTagsSectionData sectionData)
                         |> Maybe.map (\galleryWithTagsSectionData -> galleryWithTagsSectionData.items)
+
+                maybeActiveItem =
+                    maybeItems
+                        |> Maybe.andThen (\items -> find (\item -> item.itemId == itemId) items)
+
+                maybeRouteAndBla =
+                   Maybe.map2
+                      (\items activeItem -> (items, activeItem)) maybeItems maybeActiveItem
+
+
             in
-            case maybeItems of
-                Just items ->
-                    generateGalleryItemContentData (SectionImageRoute activeSectionId) itemId items
+            case maybeRouteAndBla of
+                Just (items, activeItem) ->
+                    generateGalleryItemContentData modelData.apiUrl (SectionImageRoute activeSectionId) activeItem items
                         |> GalleryImageContentData
                         |> Page.GalleryPageData
                             (generateSectionMenuData activeSectionId modelData.data)
@@ -326,7 +341,7 @@ generatePageData modelData activeRoute =
             in
             case maybeItems of
                 Just items ->
-                    generateGalleryContentData (TagImageRoute activeSectionId activeTagId) items
+                    generateGalleryContentData modelData.apiUrl (TagImageRoute activeSectionId activeTagId) items
                         |> GalleryContentData
                         |> Page.GalleryPageData
                             (generateSectionMenuData activeSectionId modelData.data)
@@ -342,10 +357,18 @@ generatePageData modelData activeRoute =
                     findSection modelData.data activeSectionId
                         |> Maybe.andThen (\sectionData -> findTag activeTagId sectionData)
                         |> Maybe.map (\tagData -> tagData.items)
+
+                maybeActiveItem =
+                    maybeItems
+                        |> Maybe.andThen (\items -> find (\item -> item.itemId == itemId) items)
+
+                maybeRouteAndBla =
+                   Maybe.map2
+                      (\items activeItem -> (items, activeItem)) maybeItems maybeActiveItem
             in
-            case maybeItems of
-                Just items ->
-                    generateGalleryItemContentData (TagImageRoute activeSectionId activeTagId) itemId items
+            case maybeRouteAndBla of
+                Just (items, activeItem) ->
+                    generateGalleryItemContentData modelData.apiUrl (TagImageRoute activeSectionId activeTagId) activeItem items
                         |> GalleryImageContentData
                         |> Page.GalleryPageData
                             (generateSectionMenuData activeSectionId modelData.data)
@@ -384,7 +407,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text id.imageId
+                                generateInfoContentData id.text modelData.apiUrl id.imageId
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MobileTogglingMenuData { menuSectionData = sd, menuOpen = False }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -410,7 +433,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                 maybeRouteAndPage =
                     Maybe.map2
                         (\items { itemId } ->
-                            generateMobileGalleryItemContentData sliderHeight (SectionImageRoute activeSectionId) itemId 0 items
+                            generateMobileGalleryItemContentData modelData.apiUrl sliderHeight (SectionImageRoute activeSectionId) itemId 0 items
                                 |> MobileGalleryContentData
                                 |> Page.GalleryPageData
                                     (generateMobileGalleryMenuData activeSectionId modelData.data)
@@ -438,7 +461,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                 maybeRouteAndPage =
                     Maybe.map2
                         (\items itemIndex ->
-                            generateMobileGalleryItemContentData sliderHeight (SectionImageRoute activeSectionId) itemId itemIndex items
+                            generateMobileGalleryItemContentData modelData.apiUrl sliderHeight (SectionImageRoute activeSectionId) itemId itemIndex items
                                 |> MobileGalleryContentData
                                 |> Page.GalleryPageData
                                     (generateMobileGalleryMenuData activeSectionId modelData.data)
@@ -466,7 +489,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                 maybeRouteAndPage =
                     Maybe.map2
                         (\items { itemId } ->
-                            generateMobileGalleryItemContentData sliderHeight (TagImageRoute activeSectionId activeTagId) itemId 0 items
+                            generateMobileGalleryItemContentData modelData.apiUrl sliderHeight (TagImageRoute activeSectionId activeTagId) itemId 0 items
                                 |> MobileGalleryContentData
                                 |> Page.GalleryPageData
                                     (generateMobileGalleryMenuData activeSectionId modelData.data)
@@ -494,7 +517,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                 maybeRouteAndPage =
                     Maybe.map2
                         (\items itemIndex ->
-                            generateMobileGalleryItemContentData sliderHeight (TagImageRoute activeSectionId activeTagId) itemId itemIndex items
+                            generateMobileGalleryItemContentData modelData.apiUrl sliderHeight (TagImageRoute activeSectionId activeTagId) itemId itemIndex items
                                 |> MobileGalleryContentData
                                 |> Page.GalleryPageData
                                     (generateMobileGalleryMenuData activeSectionId modelData.data)
@@ -574,16 +597,17 @@ allFieldsPresent : Model -> Maybe ( Route, ReadyModelData )
 allFieldsPresent newModel =
     case newModel of
         InitModel data ->
-            Maybe.map4
-                (\appData vp key url ->
+            Maybe.map5
+                (\appData vp urlString key url ->
                     let
                         route =
                             parseToRoute url appData vp
                     in
-                    ( route, { data = appData, viewport = vp, key = key, route = route, page = InitialPage } )
+                    ( route, { data = appData, apiUrl = urlString,viewport = vp, key = key, route = route, page = InitialPage } )
                 )
                 data.data
                 data.viewport
+                (Just data.dataUrl)
                 (Just data.key)
                 (Just data.url)
 
@@ -607,22 +631,18 @@ main =
 
 
 init : Flags -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
-init { apiBaseUrl, apiUrl, apiPort, apiProtocol } url key =
-    ( InitModel (InitModelData url key Nothing Nothing)
+init { apiBaseUrl, dataPath, imagePath, apiPort, apiProtocol } url key =
+    let baseUrl =
+          apiProtocol
+            ++ "://"
+            ++ apiBaseUrl
+            ++ apiPort
+            ++ "/"
+    in
+    ( InitModel (InitModelData url (baseUrl ++ imagePath ++ "/") key Nothing Nothing)
     , Cmd.batch
         [ get
-            { url =
-                apiProtocol
-                    ++ "://"
-                    ++ apiBaseUrl
-                    ++ (if apiPort /= "none" then
-                            ":" ++ apiPort
-
-                        else
-                            ""
-                       )
-                    ++ "/"
-                    ++ apiUrl
+            { url = baseUrl ++ dataPath
             , expect = expectJson SetData appDataDecoder
             }
         , Task.perform SetViewport getViewport
@@ -698,7 +718,7 @@ infoPage data =
                 [ buildMenu menuData
                 , div [ class "info-wrapper" ]
                     [ div [ class "info-image" ]
-                        [ img [ src <| imgPath ++ infoContentData.imageId ] [] ]
+                        [ img [ src infoContentData.urlString ] [] ]
                     , div [ class "info-text" ] [ text infoContentData.text ]
                     ]
                 ]

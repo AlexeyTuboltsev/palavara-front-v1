@@ -525,8 +525,8 @@ body {
     grid-auto-flow: dense;
     grid-column-gap: 1vw;
     grid-row-gap: 8rem;
-    align-items: center;
-    justify-items: center;
+    overflow: scroll;
+
     .image {
       opacity: 1;
       transition: none;
@@ -554,7 +554,7 @@ body {
   }
 
   & img {
-
+    max-width: 100%;
   }
 
   & .prev,

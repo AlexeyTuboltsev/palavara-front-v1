@@ -24,8 +24,8 @@ type alias TagData =
 
 type alias ItemData =
     { itemId : ItemId
-    , width : Int
-    , height : Int
+    , fileName : String
+    , urlString : String
     }
 
 
@@ -73,13 +73,9 @@ appDataDecoder =
 itemDataDecoder : JD.Decoder ItemData
 itemDataDecoder =
     JD.map3 ItemData
-        itemIdDecoder
-        (JD.field "width" JD.int)
-        (JD.field "height" JD.int)
-
-
-itemIdDecoder =
-    JD.field "itemId" JD.string
+        (JD.field "itemId" JD.string)
+        (JD.field "fileName" JD.string)
+        (JD.field "urlString" JD.string)
 
 
 tagDataDecoder : JD.Decoder TagData

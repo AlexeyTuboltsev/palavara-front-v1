@@ -3,17 +3,19 @@
 require("./styles.scss");
 
 const devFlags = {
-  apiProtocol: "http",
-  apiBaseUrl: ELM_CONFIG.dataApiUrl,
-  apiPort: '3061',
-  apiUrl: 'data'
+  apiBaseUrl: ELM_CONFIG.apiBaseUrl,
+  apiProtocol: ELM_CONFIG.apiProtocol,
+  apiPort: ELM_CONFIG.apiPort,
+  dataPath: ELM_CONFIG.dataPath,
+  imagePath: ELM_CONFIG.imagePath
 }
 
 const prodFlags = {
-  apiProtocol: "https",
-  apiBaseUrl: "d3n5xpivjiodis.cloudfront.net",
-  apiPort: "none",
-  apiUrl: "data.json"
+  apiBaseUrl: ELM_CONFIG.apiBaseUrl,
+  apiProtocol: ELM_CONFIG.apiProtocol,
+  apiPort: ELM_CONFIG.apiPort,
+  dataPath: ELM_CONFIG.dataPath,
+  imagePath: ELM_CONFIG.imagePath
 }
 
 const {Elm} = require('./Main');

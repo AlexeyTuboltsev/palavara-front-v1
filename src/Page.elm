@@ -5,7 +5,6 @@ import List.Extra exposing (find, findIndex, getAt, indexedFoldl)
 import Message exposing (Msg(..))
 import Route exposing (Route(..), routeToUrlPath)
 
-imgPath = "/img/"
 type Page
     = StartPage StartPageData
     | InfoPage InfoPageData
@@ -91,8 +90,6 @@ type alias ItemContentData =
     { itemId : ItemId
     , urlString : String
     , onClickMessage : Msg
-    , width : Int
-    , height : Int
     , isActive : Bool
     }
 
@@ -106,7 +103,7 @@ type alias ActiveItemContentData =
 
 
 type alias InfoContentData =
-    { imageId : String
+    { urlString : String
     , text : String
     }
 
@@ -297,63 +294,59 @@ generateMobileMenuTagData tags sectionId =
 -- SECTION CONTENT --
 
 
-generateGalleryContentData : (ItemId -> Route) -> List ItemData -> GalleryContentDataType
-generateGalleryContentData nextRoute items =
+generateGalleryContentData : String -> (ItemId -> Route) -> List ItemData -> GalleryContentDataType
+generateGalleryContentData apiUrl nextRoute items =
     let
         onClickMessage itemId =
             GoToRoute <| nextRoute itemId
     in
     List.map
-        (\{ itemId, width, height } ->
+        (\{ itemId, urlString, fileName } ->
             ItemContentData
                 itemId
-                (imgPath ++ itemId)
+                (apiUrl ++ fileName)
                 (onClickMessage itemId)
-                width
-                height
                 False
         )
         items
         |> GalleryContentDataType
 
 
-generateGalleryItemContentData : (ItemId -> Route) -> ItemId -> List ItemData -> GalleryImageContentDataType
-generateGalleryItemContentData nextRoute activeItemId items =
+generateGalleryItemContentData : String -> (ItemId -> Route) -> ItemData -> List ItemData -> GalleryImageContentDataType
+generateGalleryItemContentData apiUrl nextRoute activeItem items =
     let
         onClickMessage itemId =
             GoToRoute <| nextRoute itemId
 
         itemDataList =
             List.map
-                (\{ itemId, width, height } ->
+                (\{ itemId, urlString, fileName  } ->
                     ItemContentData
                         itemId
-                        (imgPath ++ itemId)
+                        (apiUrl ++ fileName)
                         (onClickMessage itemId)
-                        width
-                        height
-                        (itemId == activeItemId)
+                        (itemId == activeItem.itemId)
                 )
                 items
 
         prevOnClick =
-            findIndex (\{ itemId } -> itemId == activeItemId) items
+            findIndex (\{ itemId } -> itemId == activeItem.itemId) items
                 |> Maybe.andThen (\i -> getAt (i - 1) items)
                 |> Maybe.andThen (\{ itemId } -> Just <| onClickMessage itemId)
 
         nextOnClick =
-            findIndex (\{ itemId } -> itemId == activeItemId) items
+            findIndex (\{ itemId } -> itemId == activeItem.itemId) items
                 |> Maybe.andThen (\i -> getAt (i + 1) items)
                 |> Maybe.andThen (\{ itemId } -> Just <| onClickMessage itemId)
 
         activeItemData =
-            ActiveItemContentData activeItemId ("/img/" ++ activeItemId) prevOnClick nextOnClick
+            ActiveItemContentData activeItem.itemId (apiUrl ++ activeItem.fileName) prevOnClick nextOnClick
     in
     GalleryImageContentDataType itemDataList activeItemData
 
 
-generateMobileGalleryItemContentData : Float -> (ItemId -> Route) -> ItemId -> Int -> List ItemData -> MobileGalleryContentDataType
-generateMobileGalleryItemContentData sliderHeight nextRoute activeItemId activeItemIndex items =
+generateMobileGalleryItemContentData : String -> Float -> (ItemId -> Route) -> ItemId -> Int -> List ItemData -> MobileGalleryContentDataType
+generateMobileGalleryItemContentData apiUrl sliderHeight nextRoute activeItemId activeItemIndex items =
     let
         onClickMessage itemId =
             case itemId == activeItemId of
@@ -368,13 +361,11 @@ generateMobileGalleryItemContentData sliderHeight nextRoute activeItemId activeI
 
         itemDataList =
             List.map
-                (\{ itemId, width, height } ->
+                 (\{ itemId, urlString, fileName  } ->
                     ItemContentData
                         itemId
-                        (imgPath ++ itemId)
+                        (apiUrl ++ fileName)
                         (onClickMessage itemId)
-                        width
-                        height
                         (itemId == activeItemId)
                 )
                 items
@@ -382,9 +373,9 @@ generateMobileGalleryItemContentData sliderHeight nextRoute activeItemId activeI
     MobileGalleryContentDataType itemDataList activeItemIndex sliderHeight topOffset Nothing False
 
 
-generateInfoContentData : String -> String -> InfoContentData
-generateInfoContentData text imageId =
-    InfoContentData imageId text
+generateInfoContentData : String -> String -> String -> InfoContentData
+generateInfoContentData text apiUrl imageId =
+    InfoContentData (apiUrl ++ imageId) text
 
 
 -- UTILS --
