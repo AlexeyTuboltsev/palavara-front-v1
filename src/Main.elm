@@ -6,13 +6,14 @@ import Browser.Dom exposing (Viewport, getViewport, getViewportOf)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation exposing (Key, load)
 import Constants exposing (mobileBreakpoint)
-import Html exposing (Html, a, div, img, span, text)
-import Html.Attributes exposing (class, href, id, src, style)
+import Html exposing (Html, a, br, div, img, span, text)
+import Html.Attributes exposing (class, href, id, property, src, style)
 import Html.Events.Extra exposing (onClickPreventDefault, onClickPreventDefaultAndStopPropagation)
 import Html.Events.Extra.Pointer as Pointer
 import Html.Keyed exposing (node)
 import Http exposing (expectJson, get)
 import Icons exposing (instagram, logo, minus, plus)
+import Json.Encode as Json
 import List.Extra exposing (find, getAt)
 import Message exposing (Msg(..))
 import Page exposing (ActiveItemContentData, GalleryContentData(..), GalleryContentDataType, GalleryImageContentDataType, GalleryPageData, InfoPageData, ItemContentData, ListPageData, MenuData(..), MenuSectionData, MenuSectionType(..), MenuTagData, MobileGalleryContentDataType, Page(..), StartPageData, calculateTopOffset, findItemIndex, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoContentData, generateInfoMenuData, generateMobileGalleryItemContentData, generateMobileGalleryMenuData, generateMobileMenuData, generateRootMenuData, generateSectionMenuData, getGalleryWithTagsSectionData)
@@ -733,7 +734,14 @@ infoPage data =
                 , div [ class "info-wrapper" ]
                     [ div [ class "info-image" ]
                         [ img [ src infoContentData.urlString ] [] ]
-                    , div [ class "info-text" ] [ text infoContentData.text ]
+                    , div [ class "info-text" ] [
+                        text infoContentData.text
+                        , br [] []
+                        , br [] []
+                        , text "Visit my shop at Etsy"
+                        , br [] []
+                        , a [href etsyLink] [ text etsyLink]
+                    ]
                     ]
                 ]
             ]
