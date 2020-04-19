@@ -16,7 +16,7 @@ $menu-inner-margin: 2.4rem;
 $margin: 1.8rem;
 $margin-small: 1.4rem;
 $start-background-image: "../public/img/0.jpg";
-$logo-label-height: 1.25rem;
+$logo-label-height: 1.45rem;
 $text-size: 1.45rem;
 
 :root {
@@ -573,10 +573,11 @@ body {
   padding: $margin $margin-small;
 
   background-color: $color-light-gray;
-  transition: width 2s ease 0s;
+  transition: width 2s ease 0s,padding 2s ease 0s;
 
   &.off {
     width: 0;
+    padding:0;
   }
 
   &.on {
