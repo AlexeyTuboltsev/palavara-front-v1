@@ -10,6 +10,7 @@ import Html exposing (Html, a, div, img, span, text)
 import Html.Attributes exposing (class, href, id, src, style)
 import Html.Events.Extra exposing (onClickPreventDefault)
 import Html.Events.Extra.Pointer as Pointer
+import Html.Keyed exposing (node)
 import Http exposing (expectJson, get)
 import Icons exposing (logo, minus, plus)
 import List.Extra exposing (find, getAt)
@@ -769,7 +770,8 @@ galleryPage data =
 
 buildPictures : { x | items : List ItemContentData } -> Html Msg
 buildPictures contentData =
-    div
+    node
+        "div"
         [ class "image-group" ]
         (List.map
             (\itemData ->
@@ -822,7 +824,8 @@ buildMobilePictures contentData =
         , Pointer.onCancel (relativePos >> UpMsg)
         , Html.Attributes.style "touch-action" "none"
         ]
-        [ div
+        [ node
+            "div"
             [ class "image-group"
             , style "top" (String.fromFloat contentData.topOffset ++ "px")
             , id "image-group"
@@ -841,8 +844,10 @@ buildMobilePictures contentData =
         ]
 
 
-buildSectionPicture : String -> Msg -> Bool -> ItemId -> Html Msg
+buildSectionPicture : String -> Msg -> Bool -> ItemId -> (String,Html Msg)
 buildSectionPicture urlString onClickMessage isActive itemId =
+    (itemId
+    ,
     a
         [ id itemId
         , class
@@ -855,7 +860,7 @@ buildSectionPicture urlString onClickMessage isActive itemId =
         , onClickPreventDefault onClickMessage
         ]
         [ img [ src urlString ] []
-        ]
+        ])
 
 
 buildMenu : MenuData -> Html Msg
