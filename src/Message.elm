@@ -20,3 +20,5 @@ type Msg
     | UpMsg ( Float, Float )
     | CloseMenu
     | OpenMenu
+    | GoToShop
+    | GoToInstagram

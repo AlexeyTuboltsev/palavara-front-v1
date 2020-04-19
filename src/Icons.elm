@@ -1,4 +1,4 @@
-module Icons exposing (logo, minus, plus)
+module Icons exposing (logo, minus, plus, instagram)
 
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
@@ -27,3 +27,10 @@ minus =
     svg [  x "0px", y "0px", height "100%", viewBox "0 0 49 49" ]
         [ Svg.line [ fill "none", strokeMiterlimit "10", x1 "48.5", y1 "25", x2 "0.5", y2 "25" ] []
         ]
+
+instagram =
+    svg [ x "0px", y "0px", viewBox "0 0 43.15 43.15" ]
+    [ Svg.path [d "M29.65,41.65H13.5c-6.6,0-12-5.4-12-12V13.5c0-6.6,5.4-12,12-12h16.15c6.6,0,12,5.4,12,12v16.15 C41.65,36.25,36.25,41.65,29.65,41.65z" ] []
+     , Svg.circle [cx "21.57", cy "21.57", r "8.32"] []
+     , Svg.circle [cx "33.55", cy "10.05", r "2.73"] []
+    ]

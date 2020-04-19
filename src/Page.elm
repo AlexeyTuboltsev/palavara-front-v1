@@ -114,7 +114,7 @@ generateRootMenuData : SectionData -> MenuSectionData
 generateRootMenuData section =
     case section of
         GalleryWithTagsSectionType { sectionId, label, tags } ->
-            generateMenuEntryData GalleryWithTags False sectionId label (SectionRoute sectionId) (generateMenuTagData tags sectionId)
+            generateMenuEntryData GalleryWithTags False sectionId label (SectionRoute sectionId) (generateMenuTagData Nothing tags sectionId )
 
         GallerySectionType { sectionId, label } ->
             MenuSectionData Gallery sectionId label False [] (GoToRoute <| SectionRoute sectionId) (routeToUrlPath <| SectionRoute sectionId)
@@ -148,7 +148,7 @@ generateMobileMenuData section =
 generateMobileGalleryMenuData : SectionId -> AppData -> MenuData
 generateMobileGalleryMenuData activeSectionId sections =
     let
-        bla =
+        menuSectionData =
             List.map
                 (\section ->
                     case section of
@@ -172,7 +172,7 @@ generateMobileGalleryMenuData activeSectionId sections =
                 )
                 sections
     in
-    MobileTogglingMenuData { menuSectionData = bla, menuOpen = False }
+    MobileTogglingMenuData { menuSectionData = menuSectionData, menuOpen = False }
 
 
 
@@ -183,7 +183,7 @@ generateInfoMenuData : SectionData -> MenuSectionData
 generateInfoMenuData section =
     case section of
         GalleryWithTagsSectionType { sectionId, label, tags } ->
-            generateMenuEntryData GalleryWithTags False sectionId label (SectionRoute sectionId) (generateMenuTagData tags sectionId)
+            generateMenuEntryData GalleryWithTags False sectionId label (SectionRoute sectionId) (generateMenuTagData Nothing tags sectionId )
 
         GallerySectionType { sectionId, label } ->
             MenuSectionData Gallery sectionId label False [] NoOp ""
@@ -196,13 +196,13 @@ generateInfoMenuData section =
 -- SECTION AND TAG MENU --
 
 
-generateSectionMenuData : SectionId -> List SectionData -> MenuData
-generateSectionMenuData activeSectionId sections =
-    generateSectionMenuDataInternal activeSectionId sections generateMenuTagData
+generateSectionMenuData : SectionId -> Maybe TagId -> List SectionData -> MenuData
+generateSectionMenuData activeSectionId maybeActiveTagId sections =
+    generateSectionMenuDataInternal activeSectionId maybeActiveTagId sections (generateMenuTagData maybeActiveTagId)
 
 
-generateSectionMenuDataInternal : SectionId -> List SectionData -> (List TagData -> SectionId -> List MenuTagData) -> MenuData
-generateSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
+generateSectionMenuDataInternal : SectionId -> Maybe TagId -> List SectionData -> (List TagData -> SectionId -> List MenuTagData) -> MenuData
+generateSectionMenuDataInternal activeSectionId maybeActiveTagId sections tagMenuGeneratingFn =
     List.map
         (\section ->
             case section of
@@ -212,13 +212,16 @@ generateSectionMenuDataInternal activeSectionId sections tagMenuGeneratingFn =
                 GalleryWithTagsSectionType { sectionId, label, tags } ->
                     let
                         sectionIsActive =
-                            isSectionActive activeSectionId sectionId
+                            case maybeActiveTagId of
+                                Just _ -> False
+                                Nothing ->
+                                    isSectionActive activeSectionId sectionId
                     in
                     tagMenuGeneratingFn tags sectionId
                         |> generateMenuEntryData GalleryWithTags sectionIsActive sectionId label (SectionRoute sectionId)
 
                 GallerySectionType { sectionId, label } ->
-                    MenuSectionData Gallery sectionId label False [] NoOp ""
+                    MenuSectionData Gallery sectionId label (sectionId == activeSectionId) [] NoOp ""
         )
         sections
         |> (\s -> MenuData { menuSectionData = s })
@@ -243,26 +246,23 @@ generateMenuEntryAttributes sectionIsActive nextRoute =
             { sectionIsActive = False, onClickMessage = GoToRoute <| nextRoute, urlString = routeToUrlPath nextRoute }
 
         True ->
-            { sectionIsActive = False, onClickMessage = NoOp, urlString = "" }
+            { sectionIsActive = True, onClickMessage = NoOp, urlString = "" }
 
-generateMenuTagData : List TagData -> SectionId -> List MenuTagData
-generateMenuTagData tags sectionId =
+generateMenuTagData : Maybe TagId ->  List TagData -> SectionId -> List MenuTagData
+generateMenuTagData maybeActiveTagId tags sectionId  =
     List.map
         (\{ tagId, label, items } ->
             let
-                firstItem =
-                    getAt 0 items
-            in
-            case firstItem of
-                Nothing ->
-                    MenuTagData tagId label False (GoToRoute <| Root) (routeToUrlPath Root)
+                route =
+                    TagRoute sectionId tagId
 
-                Just { itemId } ->
-                    let
-                        route =
-                            TagRoute sectionId tagId
-                    in
-                    MenuTagData tagId label False (GoToRoute <| route) (routeToUrlPath route)
+                tagIsActive =
+                    case maybeActiveTagId of
+                        Just activeTagId ->
+                            activeTagId == tagId
+                        Nothing -> False
+            in
+            MenuTagData tagId label tagIsActive (GoToRoute <| route) (routeToUrlPath route)
         )
         tags
 
@@ -427,7 +427,7 @@ calculateTopOffset : Float -> Int -> Float
 calculateTopOffset sliderHeight activeItemIndex =
     let
         imageHeight =
-            sliderHeight * 0.7
+            sliderHeight * 0.6
 
         initialOffset =
             (sliderHeight - imageHeight) / 2

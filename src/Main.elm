@@ -4,15 +4,15 @@ import AppData exposing (..)
 import Browser
 import Browser.Dom exposing (Viewport, getViewport, getViewportOf)
 import Browser.Events exposing (onResize)
-import Browser.Navigation as Navigation exposing (Key)
+import Browser.Navigation as Navigation exposing (Key, load)
 import Constants exposing (mobileBreakpoint)
 import Html exposing (Html, a, div, img, span, text)
 import Html.Attributes exposing (class, href, id, src, style)
-import Html.Events.Extra exposing (onClickPreventDefault)
+import Html.Events.Extra exposing (onClickPreventDefault, onClickPreventDefaultAndStopPropagation)
 import Html.Events.Extra.Pointer as Pointer
 import Html.Keyed exposing (node)
 import Http exposing (expectJson, get)
-import Icons exposing (logo, minus, plus)
+import Icons exposing (instagram, logo, minus, plus)
 import List.Extra exposing (find, getAt)
 import Message exposing (Msg(..))
 import Page exposing (ActiveItemContentData, GalleryContentData(..), GalleryContentDataType, GalleryImageContentDataType, GalleryPageData, InfoPageData, ItemContentData, ListPageData, MenuData(..), MenuSectionData, MenuSectionType(..), MenuTagData, MobileGalleryContentDataType, Page(..), StartPageData, calculateTopOffset, findItemIndex, findSection, findTag, generateGalleryContentData, generateGalleryItemContentData, generateInfoContentData, generateInfoMenuData, generateMobileGalleryItemContentData, generateMobileGalleryMenuData, generateMobileMenuData, generateRootMenuData, generateSectionMenuData, getGalleryWithTagsSectionData)
@@ -22,8 +22,12 @@ import Task
 import Url exposing (Url)
 
 
-imgPath =
-    "/img/"
+etsyLink =
+    "https://www.etsy.com/shop/palavara/"
+
+
+instagramLink =
+    "https://www.instagram.com/palavara_ceramics/"
 
 
 type alias Flags =
@@ -128,7 +132,7 @@ update message model =
                 GoToRoute route ->
                     case readyModelData.viewport.viewport.width <= mobileBreakpoint of
                         True ->
-                            generateMobilePageData readyModelData (readyModelData.viewport.viewport.height - 41) route
+                            generateMobilePageData readyModelData readyModelData.viewport.scene.height route
 
                         False ->
                             generatePageData readyModelData route
@@ -237,6 +241,12 @@ update message model =
                         _ ->
                             ( ReadyModel readyModelData, Cmd.none )
 
+                GoToShop ->
+                    ( model, load etsyLink )
+
+                GoToInstagram ->
+                    ( model, load instagramLink )
+
                 _ ->
                     ( model, Cmd.none )
 
@@ -295,7 +305,7 @@ generatePageData modelData activeRoute =
                     generateGalleryContentData modelData.apiUrl (SectionImageRoute activeSectionId) items
                         |> GalleryContentData
                         |> Page.GalleryPageData
-                            (generateSectionMenuData activeSectionId modelData.data)
+                            (generateSectionMenuData activeSectionId Nothing modelData.data)
                         |> GalleryPage
                         |> (\page -> ( ReadyModel <| ReadyModelData modelData.viewport modelData.key modelData.apiUrl activeRoute page modelData.data, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
 
@@ -324,7 +334,7 @@ generatePageData modelData activeRoute =
                     generateGalleryItemContentData modelData.apiUrl (SectionImageRoute activeSectionId) activeItem items
                         |> GalleryImageContentData
                         |> Page.GalleryPageData
-                            (generateSectionMenuData activeSectionId modelData.data)
+                            (generateSectionMenuData activeSectionId Nothing modelData.data)
                         |> GalleryPage
                         |> (\page -> ( ReadyModel { modelData | route = activeRoute, page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
 
@@ -343,7 +353,7 @@ generatePageData modelData activeRoute =
                     generateGalleryContentData modelData.apiUrl (TagImageRoute activeSectionId activeTagId) items
                         |> GalleryContentData
                         |> Page.GalleryPageData
-                            (generateSectionMenuData activeSectionId modelData.data)
+                            (generateSectionMenuData activeSectionId (Just activeTagId) modelData.data)
                         |> GalleryPage
                         |> (\page -> ( ReadyModel { modelData | route = activeRoute, page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
 
@@ -361,18 +371,18 @@ generatePageData modelData activeRoute =
                     maybeItems
                         |> Maybe.andThen (\items -> find (\item -> item.itemId == itemId) items)
 
-                maybeRouteAndBla =
+                maybeItemsAndActiveItem =
                     Maybe.map2
                         (\items activeItem -> ( items, activeItem ))
                         maybeItems
                         maybeActiveItem
             in
-            case maybeRouteAndBla of
+            case maybeItemsAndActiveItem of
                 Just ( items, activeItem ) ->
                     generateGalleryItemContentData modelData.apiUrl (TagImageRoute activeSectionId activeTagId) activeItem items
                         |> GalleryImageContentData
                         |> Page.GalleryPageData
-                            (generateSectionMenuData activeSectionId modelData.data)
+                            (generateSectionMenuData activeSectionId (Just activeTagId) modelData.data)
                         |> GalleryPage
                         |> (\page -> ( ReadyModel { modelData | route = activeRoute, page = page }, Navigation.pushUrl modelData.key <| routeToUrlPath activeRoute ))
 
@@ -844,11 +854,10 @@ buildMobilePictures contentData =
         ]
 
 
-buildSectionPicture : String -> Msg -> Bool -> ItemId -> (String,Html Msg)
+buildSectionPicture : String -> Msg -> Bool -> ItemId -> ( String, Html Msg )
 buildSectionPicture urlString onClickMessage isActive itemId =
-    (itemId
-    ,
-    a
+    ( itemId
+    , a
         [ id itemId
         , class
             (if isActive then
@@ -860,53 +869,63 @@ buildSectionPicture urlString onClickMessage isActive itemId =
         , onClickPreventDefault onClickMessage
         ]
         [ img [ src urlString ] []
-        ])
+        ]
+    )
 
 
 buildMenu : MenuData -> Html Msg
 buildMenu menuData =
     case menuData of
         MenuData { menuSectionData } ->
-            div [ class "menu-wrapper" ]
+            div [ class "menu-wrapper", id "menu-wrapper" ]
                 [ div [ class "menu-background" ] [ div [ class "menu-background-inner" ] [] ]
                 , div [ class "menu" ] (List.append (buildEntries menuSectionData) [ buildLogo ])
                 ]
 
         MenuInfoData { menuSectionData } ->
-            div [ class "menu-wrapper" ]
+            div [ class "menu-wrapper", id "menu-wrapper" ]
                 [ div [ class "menu-background" ] [ div [ class "menu-background-inner" ] [] ]
                 , div [ class "menu" ] (List.append (buildEntries menuSectionData) [])
                 ]
 
         MobileMenuData { menuSectionData } ->
-            div [ class "menu-wrapper" ]
+            div [ class "menu-wrapper", id "menu-wrapper mobile" ]
                 [ div [ class "menu-background" ] [ div [ class "menu-background-inner" ] [] ]
-                , div [ class "menu" ] (buildEntries menuSectionData)
+                , div [ class "menu" ]
+                    (List.concat
+                        [ buildMobileEntries menuSectionData
+                        , [ a [ class "instagram", onClickPreventDefaultAndStopPropagation GoToInstagram, href instagramLink ] [ instagram ] ]
+                        ]
+                    )
                 ]
 
         MobileTogglingMenuData { menuSectionData, menuOpen } ->
             case menuOpen of
                 True ->
-                    div [ class "menu-wrapper" ]
+                    div [ class "menu-wrapper", id "menu-wrapper mobile" ]
                         [ div [ class "menu-background" ] [ div [ class "menu-background-inner" ] [] ]
                         , div [ class "menu" ]
-                            (List.append
-                                [ buildLogo
-                                , div [ class "menu-line" ] []
+                            (List.concat
+                                [ [ buildLogo
+                                  , div [ class "menu-line" ] []
+                                  ]
+                                , List.map (\sectionData -> buildMobileEntry sectionData) menuSectionData
+                                , [ a [ class "instagram", onClickPreventDefaultAndStopPropagation GoToInstagram, href instagramLink ] [ instagram ] ]
                                 ]
-                                (List.map (\sectionData -> buildEntry sectionData) menuSectionData)
                             )
                         ]
 
                 False ->
-                    div [ class "menu-wrapper" ]
+                    div [ class "menu-wrapper", id "menu-wrapper mobile" ]
                         [ div [ class "menu-background closed" ] [ div [ class "menu-background-inner" ] [] ]
                         , div [ class "menu closed", onClickPreventDefault OpenMenu ]
-                            (List.append
-                                [ buildLogo
-                                , div [ class "menu-line" ] []
+                            (List.concat
+                                [ [ buildLogo
+                                  , div [ class "menu-line" ] []
+                                  ]
+                                , List.map (\sectionData -> buildMobileEntry sectionData) menuSectionData
+                                , [ a [ class "instagram", onClickPreventDefaultAndStopPropagation GoToInstagram, href instagramLink ] [ instagram ] ]
                                 ]
-                                (List.map (\sectionData -> buildEntry sectionData) menuSectionData)
                             )
                         ]
 
@@ -919,10 +938,17 @@ buildEntries menuData =
         ]
         (List.map (\sectionData -> buildEntry sectionData) menuData)
 
+buildMobileEntries : List MenuSectionData -> List (Html Msg)
+buildMobileEntries menuData =
+    List.append
+        [ div [ class "logo-label" ] [ text "Varvara Polyakova" ]
+        , div [ class "menu-line" ] []
+        ]
+        (List.map (\sectionData -> buildMobileEntry sectionData) menuData)
 
 buildLogo : Html Msg
 buildLogo =
-    div [ class "logo", onClickPreventDefault <| GoToRoute Root ] [ Icons.logo ]
+    div [ class "logo", onClickPreventDefault <| GoToRoute Root ] [ logo ]
 
 
 buildEntry : MenuSectionData -> Html Msg
@@ -935,20 +961,42 @@ buildEntry sectionData =
             buildGalleryWithTagsEntry sectionData
 
 
+buildMobileEntry : MenuSectionData -> Html Msg
+buildMobileEntry sectionData =
+    case sectionData.sectionType of
+        Info ->
+            buildMobileInfoEntry sectionData
+
+        _ ->
+            buildGalleryWithTagsEntry sectionData
+
+
 buildInfoEntry : MenuSectionData -> Html Msg
 buildInfoEntry sectionData =
     div [ class "menu-entry info" ]
-        [ a [ class "menu-entry-label", onClickPreventDefault sectionData.onClickMessage, href sectionData.urlString ] [ text sectionData.sectionLabel ] ]
+        [ a [ class "menu-entry-label", onClickPreventDefault sectionData.onClickMessage, href sectionData.urlString ] [ text sectionData.sectionLabel ]
+        , span [ class "info-pipe" ] [ text "|" ]
+        , a [ class "menu-entry-label", onClickPreventDefaultAndStopPropagation GoToShop, href etsyLink ] [ text "shop" ]
+        , span [ class "info-pipe" ] [ text "|" ]
+        , a [ class "instagram", onClickPreventDefaultAndStopPropagation GoToInstagram, href instagramLink ] [ instagram ]
+        ]
 
+buildMobileInfoEntry : MenuSectionData -> Html Msg
+buildMobileInfoEntry sectionData =
+    div [ class "menu-entry info" ]
+        [ a [ class "menu-entry-label", onClickPreventDefault sectionData.onClickMessage, href sectionData.urlString ] [ text sectionData.sectionLabel ]
+        , span [ class "info-pipe" ] [ text "|" ]
+        , a [ class "menu-entry-label", onClickPreventDefaultAndStopPropagation GoToShop, href etsyLink ] [ text "shop" ]
+        ]
 
 buildGalleryWithTagsEntry : MenuSectionData -> Html Msg
 buildGalleryWithTagsEntry sectionData =
     div [ class "menu-entry" ]
         [ div
             [ class
-                ("menu-entry-label "
+                ("menu-entry-label"
                     ++ (if sectionData.sectionIsActive == True then
-                            "active"
+                            " active"
 
                         else
                             ""
@@ -968,7 +1016,7 @@ buildTags tagDataList =
                 [ text "|"
                 ]
             )
-        |> List.intersperse (text " \u{00A0}")
+        |> List.intersperse (text "\u{00A0}")
 
 
 buildTag : MenuTagData -> Html Msg
