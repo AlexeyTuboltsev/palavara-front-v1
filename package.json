@@ -19,7 +19,8 @@
     "dev": "webpack-dev-server --hot --colors --port 3000",
     "prod": "webpack -p",
     "analyse": "elm-analyse -s -p 3001 -o",
-    "deploy": "npm run build && scripts/deploy.sh"
+    "deploy": "npm run build && scripts/deploy.sh",
+    "deploy-production": "npm run build && scripts/deploy-prod.sh"
   },
   "license": "MIT",
   "devDependencies": {
