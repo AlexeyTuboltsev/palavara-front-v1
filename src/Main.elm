@@ -7,10 +7,11 @@ import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation exposing (Key, load)
 import Constants exposing (mobileBreakpoint)
 import Html exposing (Html, a, br, div, img, span, text)
-import Html.Attributes exposing (class, href, id, property, src, style)
+import Html.Attributes exposing (class, href, id, property, rel, src, style, target)
 import Html.Events.Extra exposing (onClickPreventDefault, onClickPreventDefaultAndStopPropagation)
 import Html.Events.Extra.Pointer as Pointer
 import Html.Keyed exposing (node)
+import Html.Parser.Util
 import Http exposing (expectJson, get)
 import Icons exposing (instagram, logo, minus, plus)
 import Json.Encode as Json
@@ -21,11 +22,13 @@ import Result exposing (Result)
 import Route exposing (Route(..), parseToRoute, routeToUrlPath)
 import Task
 import Url exposing (Url)
-
+import Html.Parser
 
 etsyLink =
     "https://www.etsy.com/shop/palavara/"
 
+studioLink =
+    "https://palavara.notion.site/"
 
 instagramLink =
     "https://www.instagram.com/palavara_ceramics/"
@@ -241,9 +244,6 @@ update message model =
 
                         _ ->
                             ( ReadyModel readyModelData, Cmd.none )
-
-                GoToShop ->
-                    ( model, load etsyLink )
 
                 GoToInstagram ->
                     ( model, load instagramLink )
@@ -651,6 +651,7 @@ init { apiBaseUrl, dataPath, imagePath, apiPort, apiProtocol } url key =
             apiProtocol
                 ++ "://"
                 ++ apiBaseUrl
+                ++ ":"
                 ++ apiPort
                 ++ "/"
     in
@@ -734,18 +735,16 @@ infoPage data =
                 , div [ class "info-wrapper" ]
                     [ div [ class "info-image" ]
                         [ img [ src infoContentData.urlString ] [] ]
-                    , div [ class "info-text" ] [
-                        text infoContentData.text
-                        , br [] []
-                        , br [] []
-                        , text "Visit my shop at Etsy"
-                        , br [] []
-                        , a [href etsyLink] [ text etsyLink]
-                    ]
+                    , div [ class "info-text" ]
+                        (infoText infoContentData.text)
+
                     ]
                 ]
             ]
 
+
+infoText txt =
+    Result.withDefault [text ""] (Html.Parser.run txt |> Result.map Html.Parser.Util.toVirtualDom)
 
 listPage : Page.ListPageData -> List (Html Msg)
 listPage data =
@@ -984,7 +983,9 @@ buildInfoEntry sectionData =
     div [ class "menu-entry info" ]
         [ a [ class "menu-entry-label", onClickPreventDefault sectionData.onClickMessage, href sectionData.urlString ] [ text sectionData.sectionLabel ]
         , span [ class "info-pipe" ] [ text "|" ]
-        , a [ class "menu-entry-label", onClickPreventDefaultAndStopPropagation GoToShop, href etsyLink ] [ text "shop" ]
+        , a [ class "menu-entry-label", href etsyLink, target "_blank", rel "noopener noreferrer" ] [ text "shop" ]
+        , span [ class "info-pipe" ] [ text "|" ]
+        , a [ class "menu-entry-label", href studioLink, target "_blank", rel "noopener noreferrer" ] [ text "studio" ]
         , span [ class "info-pipe" ] [ text "|" ]
         , a [ class "instagram", onClickPreventDefaultAndStopPropagation GoToInstagram, href instagramLink ] [ instagram ]
         ]
@@ -994,7 +995,9 @@ buildMobileInfoEntry sectionData =
     div [ class "menu-entry info" ]
         [ a [ class "menu-entry-label", onClickPreventDefault sectionData.onClickMessage, href sectionData.urlString ] [ text sectionData.sectionLabel ]
         , span [ class "info-pipe" ] [ text "|" ]
-        , a [ class "menu-entry-label", onClickPreventDefaultAndStopPropagation GoToShop, href etsyLink ] [ text "shop" ]
+        , a [ class "menu-entry-label", href etsyLink, target "_blank", rel "noopener noreferrer" ] [ text "shop" ]
+        , span [ class "info-pipe" ] [ text "|" ]
+        , a [ class "menu-entry-label", href studioLink, target "_blank", rel "noopener noreferrer" ] [ text "studio" ]
         ]
 
 buildGalleryWithTagsEntry : MenuSectionData -> Html Msg
