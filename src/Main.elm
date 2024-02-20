@@ -28,7 +28,7 @@ etsyLink =
     "https://www.etsy.com/shop/palavara/"
 
 studioLink =
-    "https://palavara.notion.site/"
+    "https://studio.palavara.com/"
 
 instagramLink =
     "https://www.instagram.com/palavara_ceramics/"
