@@ -281,7 +281,7 @@ generatePageData modelData activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text modelData.apiUrl id.imageId
+                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MenuInfoData { menuSectionData = sd }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -419,7 +419,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text modelData.apiUrl id.imageId
+                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MobileTogglingMenuData { menuSectionData = sd, menuOpen = False }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -734,7 +734,7 @@ infoPage data =
                 [ buildMenu menuData
                 , div [ class "info-wrapper" ]
                     [ div [ class "info-image" ]
-                        [ img [ src infoContentData.urlString ] [] ]
+                        [ img (src infoContentData.urlString :: lqipAttrs infoContentData.lqip) [] ]
                     , div [ class "info-text" ]
                         (infoText infoContentData.text)
 
@@ -797,6 +797,7 @@ buildPictures contentData =
                     itemData.onClickMessage
                     itemData.isActive
                     itemData.itemId
+                    itemData.lqip
             )
          <|
             contentData.items
@@ -824,7 +825,7 @@ buildActiveImage activeImageData =
     in
     div [ class "main-image on" ]
         [ div prevAttributes [ minus ]
-        , img [ src activeImageData.urlString ] []
+        , img (src activeImageData.urlString :: lqipAttrs activeImageData.lqip) []
         , div nextAttributes [ plus ]
         ]
 
@@ -854,6 +855,7 @@ buildMobilePictures contentData =
                         itemData.onClickMessage
                         itemData.isActive
                         itemData.itemId
+                        itemData.lqip
                 )
              <|
                 contentData.items
@@ -861,8 +863,8 @@ buildMobilePictures contentData =
         ]
 
 
-buildSectionPicture : String -> Msg -> Bool -> ItemId -> ( String, Html Msg )
-buildSectionPicture urlString onClickMessage isActive itemId =
+buildSectionPicture : String -> Msg -> Bool -> ItemId -> String -> ( String, Html Msg )
+buildSectionPicture urlString onClickMessage isActive itemId lqip =
     ( itemId
     , a
         [ id itemId
@@ -875,7 +877,7 @@ buildSectionPicture urlString onClickMessage isActive itemId =
             )
         , onClickPreventDefault onClickMessage
         ]
-        [ img [ src urlString ] []
+        [ img (src urlString :: lqipAttrs lqip) []
         ]
     )
 
@@ -1044,6 +1046,18 @@ buildTag tagData =
         , onClickPreventDefault tagData.onClickMessage
         ]
         [ text tagData.tagLabel ]
+
+
+lqipAttrs lqip =
+    if String.isEmpty lqip then
+        []
+
+    else
+        [ style "background-image" ("url(" ++ lqip ++ ")")
+        , style "background-size" "contain"
+        , style "background-repeat" "no-repeat"
+        , style "background-position" "center"
+        ]
 
 
 relativePos : Pointer.Event -> ( Float, Float )

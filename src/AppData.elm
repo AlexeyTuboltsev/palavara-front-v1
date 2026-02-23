@@ -26,6 +26,7 @@ type alias ItemData =
     { itemId : ItemId
     , fileName : String
     , urlString : String
+    , lqip : String
     }
 
 
@@ -46,8 +47,9 @@ type alias GalleryWithTagsSectionData =
 type alias InfoSectionData =
     { label : String
     , sectionId : SectionId
-    , text: String
-    , imageId: String
+    , text : String
+    , imageId : String
+    , lqip : String
     }
 
 
@@ -72,10 +74,11 @@ appDataDecoder =
 
 itemDataDecoder : JD.Decoder ItemData
 itemDataDecoder =
-    JD.map3 ItemData
+    JD.map4 ItemData
         (JD.field "itemId" JD.string)
         (JD.field "fileName" JD.string)
         (JD.field "urlString" JD.string)
+        (JD.oneOf [ JD.field "lqip" JD.string, JD.succeed "" ])
 
 
 tagDataDecoder : JD.Decoder TagData
@@ -111,11 +114,12 @@ sectionDataDecoder =
                             |> JD.map GallerySectionType
 
                     "info" ->
-                        JD.map4 InfoSectionData
+                        JD.map5 InfoSectionData
                             (JD.field "label" JD.string)
                             (JD.field "sectionId" JD.string)
                             (JD.field "text" JD.string)
                             (JD.field "imageId" JD.string)
+                            (JD.oneOf [ JD.field "lqip" JD.string, JD.succeed "" ])
                             |> JD.map InfoSectionType
 
                     _ ->
