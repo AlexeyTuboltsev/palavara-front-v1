@@ -1,6 +1,6 @@
 module.exports = {
   ELM_CONFIG: {
-    apiBaseUrl: "'192.168.178.26'",
+    apiBaseUrl: "'localhost'",
     apiProtocol: "'http'",
     apiPort: "'3061'",
     dataPath: "'data'",
