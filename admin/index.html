@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Palavara Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      color: #222;
+      background: #f0f0f0;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0;
+      font-size: inherit;
+      font-family: inherit;
+      color: inherit;
+    }
+
+    input, textarea {
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* ── Login ── */
+    .login-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    .login-box {
+      background: #fff;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+      width: 400px;
+    }
+
+    .login-box h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 28px;
+      color: #111;
+    }
+
+    .login-box label {
+      display: block;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #555;
+    }
+
+    .login-box input {
+      display: block;
+      width: 100%;
+      margin-top: 5px;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      color: #222;
+    }
+
+    .login-box input:focus { outline: none; border-color: #888; }
+
+    .login-error {
+      color: #c0392b;
+      font-size: 13px;
+      margin-bottom: 14px;
+      min-height: 18px;
+    }
+
+    .login-box button[type=submit] {
+      width: 100%;
+      padding: 10px;
+      background: #333;
+      color: #fff;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .login-box button[type=submit]:hover { background: #111; }
+    .login-box button[type=submit]:disabled { background: #999; cursor: default; }
+
+    /* ── Layout ── */
+    .layout { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ── Topbar ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      height: 50px;
+      padding: 0 20px;
+      background: #1a1a1a;
+      color: #fff;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .topbar-title { font-size: 15px; font-weight: 600; flex: 1; }
+
+    .btn-save {
+      padding: 6px 16px;
+      background: #444;
+      color: #fff;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+
+    .btn-save.dirty { background: #e67e22; }
+    .btn-save:hover { opacity: 0.88; }
+
+    .topbar-status { font-size: 13px; color: #aaa; }
+    .topbar-status.error { color: #e74c3c; }
+
+    .btn-logout {
+      padding: 6px 12px;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .btn-logout:hover { color: #fff; border-color: #999; }
+
+    /* ── Body ── */
+    .body { flex: 1; display: flex; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 250px;
+      background: #fff;
+      border-right: 1px solid #e0e0e0;
+      overflow-y: auto;
+      flex-shrink: 0;
+      padding-bottom: 20px;
+    }
+
+    .sidebar-section { border-bottom: 1px solid #f0f0f0; }
+
+    .section-row {
+      display: flex;
+      align-items: center;
+      padding: 9px 10px 9px 12px;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .section-row:hover { background: #f6f6f6; }
+    .section-row.active { background: #efefef; }
+
+    .section-label {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .section-row.active .section-label { font-weight: 600; }
+
+    .type-badge {
+      font-size: 10px;
+      color: #bbb;
+      border: 1px solid #e0e0e0;
+      border-radius: 3px;
+      padding: 1px 4px;
+      flex-shrink: 0;
+    }
+
+    .row-actions { display: flex; gap: 1px; flex-shrink: 0; }
+
+    .row-actions button {
+      width: 24px;
+      height: 24px;
+      border-radius: 3px;
+      color: #bbb;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .row-actions button:hover { background: #eee; color: #333; }
+    .row-actions .del:hover { background: #fde8e8; color: #c0392b; }
+
+    .tag-list { padding: 0 0 6px 22px; }
+
+    .tag-row {
+      display: flex;
+      align-items: center;
+      padding: 5px 10px 5px 0;
+      cursor: pointer;
+      gap: 6px;
+      user-select: none;
+    }
+
+    .tag-row:hover { background: #f6f6f6; }
+    .tag-row.active { background: #eeeeff; }
+
+    .tag-label {
+      flex: 1;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tag-row.active .tag-label { font-weight: 600; }
+
+    .add-section-btn {
+      display: block;
+      width: 100%;
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 12px;
+      color: #999;
+    }
+
+    .add-section-btn:hover { background: #f6f6f6; color: #333; }
+
+    .add-tag-btn {
+      display: block;
+      padding: 4px 0;
+      font-size: 11px;
+      color: #aaa;
+    }
+
+    .add-tag-btn:hover { color: #555; }
+
+    /* ── Main ── */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .main-empty {
+      color: #aaa;
+      text-align: center;
+      margin-top: 80px;
+      font-size: 15px;
+    }
+
+    /* ── Tag tabs ── */
+    .tag-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .tag-tab {
+      padding: 6px 16px;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      font-size: 13px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .tag-tab.active { background: #222; color: #fff; border-color: #222; }
+    .tag-tab:hover:not(.active) { background: #f0f0f0; }
+
+    /* ── Image grid ── */
+    .image-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+
+    .image-card {
+      width: 150px;
+      background: #fff;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+    }
+
+    .image-card img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      display: block;
+      background: #eee;
+    }
+
+    .image-filename {
+      font-size: 10px;
+      color: #aaa;
+      padding: 3px 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .image-actions {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 5px;
+      background: #fafafa;
+      border-top: 1px solid #eee;
+    }
+
+    .image-actions button {
+      width: 30px;
+      height: 24px;
+      border-radius: 3px;
+      font-size: 13px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .image-actions button:hover { background: #eee; color: #222; }
+    .image-actions button:disabled { color: #ccc; cursor: default; }
+    .image-actions button:disabled:hover { background: none; }
+    .image-actions .del-img:hover { background: #fde8e8; color: #c0392b; }
+
+    /* ── Upload zone ── */
+    .upload-zone {
+      width: 150px;
+      height: 157px;
+      border: 2px dashed #ccc;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      cursor: pointer;
+      color: #bbb;
+      font-size: 12px;
+      line-height: 1.6;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: #888;
+      background: #fafafa;
+      color: #666;
+    }
+
+    /* ── Info section editor ── */
+    .info-editor { max-width: 680px; }
+
+    .info-editor h2 {
+      font-size: 17px;
+      margin-bottom: 20px;
+    }
+
+    .info-image-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .info-img {
+      width: 180px;
+      height: 180px;
+      object-fit: cover;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+      flex-shrink: 0;
+    }
+
+    .info-no-img {
+      width: 180px;
+      height: 180px;
+      background: #eee;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #bbb;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .btn-replace {
+      padding: 7px 16px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .btn-replace:hover { background: #f0f0f0; }
+
+    .info-text-label {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 7px;
+    }
+
+    .info-textarea {
+      width: 100%;
+      height: 220px;
+      padding: 10px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: vertical;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .info-textarea:focus { outline: none; border-color: #888; }
+
+    .hint { font-size: 12px; color: #aaa; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+
+  <script>
+    // =====================================================================
+    // State
+    // =====================================================================
+    const state = {
+      apiKey:          sessionStorage.getItem('apiKey')  || '',
+      apiBase:         sessionStorage.getItem('apiBase') || '',
+      data:            null,
+      dirty:           false,
+      activeSectionId: null,
+      activeTagId:     null,
+      statusMsg:       '',
+      statusError:     false,
+    };
+
+    // itemId → blob ObjectURL for newly uploaded images
+    const localPreviews = {};
+
+    // Set by triggerFileInput / triggerInfoImageInput before .click()
+    let pendingUploadTarget = null;
+
+    let statusTimer = null;
+
+    // =====================================================================
+    // Utilities
+    // =====================================================================
+    function esc(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function genId() {
+      return Array.from(crypto.getRandomValues(new Uint8Array(6)))
+        .map(b => b.toString(36).padStart(2, '0'))
+        .join('')
+        .slice(0, 8);
+    }
+
+    function slugify(label) {
+      return label.toLowerCase().replace(/\s+/g, '_').replace(/[^\w]/g, '');
+    }
+
+    // Normalise tagId passed from HTML onclick attributes ('null' string → null)
+    function normTag(tagId) {
+      return tagId === 'null' ? null : tagId;
+    }
+
+    function setStatus(msg, isError = false) {
+      state.statusMsg   = msg;
+      state.statusError = isError;
+      if (statusTimer) clearTimeout(statusTimer);
+      if (!isError && msg) {
+        statusTimer = setTimeout(() => {
+          state.statusMsg = '';
+          renderTopBar();
+        }, 4000);
+      }
+      renderTopBar();
+    }
+
+    // =====================================================================
+    // API helpers
+    // =====================================================================
+    async function apiFetch(method, path, body = null) {
+      const opts = {
+        method,
+        headers: { 'X-Admin-Key': state.apiKey },
+      };
+      if (body !== null) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      }
+      return fetch(state.apiBase + path, opts);
+    }
+
+    // =====================================================================
+    // LQIP — Canvas API (matches scripts/generate-lqip.js at 20px wide)
+    // =====================================================================
+    async function generateLqip(file) {
+      try {
+        const bitmap = await createImageBitmap(file);
+        const w = 20;
+        const h = Math.round(bitmap.height * (20 / bitmap.width));
+        const canvas = new OffscreenCanvas(w, h);
+        canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+        const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.2 });
+        return new Promise(resolve => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(fr.result);
+          fr.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.warn('LQIP generation failed:', e);
+        return '';
+      }
+    }
+
+    // =====================================================================
+    // Auth / session
+    // =====================================================================
+    async function handleLogin(e) {
+      e.preventDefault();
+      const apiBase = document.getElementById('inputApiBase').value.trim().replace(/\/$/, '');
+      const apiKey  = document.getElementById('inputApiKey').value.trim();
+      const errEl   = document.getElementById('loginError');
+      const btn     = document.getElementById('loginBtn');
+
+      errEl.textContent = '';
+      btn.disabled      = true;
+      btn.textContent   = 'Logging in\u2026';
+
+      try {
+        const res = await fetch(apiBase + '/admin/data', {
+          headers: { 'X-Admin-Key': apiKey },
+        });
+        if (res.status === 401) {
+          errEl.textContent = 'Invalid API key.';
+          return;
+        }
+        if (!res.ok) {
+          errEl.textContent = `Error ${res.status}: ${await res.text()}`;
+          return;
+        }
+        const data = await res.json();
+        state.apiBase = apiBase;
+        state.apiKey  = apiKey;
+        sessionStorage.setItem('apiBase', apiBase);
+        sessionStorage.setItem('apiKey',  apiKey);
+        applyData(data);
+      } catch (err) {
+        errEl.textContent = 'Network error: ' + err.message;
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Login';
+      }
+    }
+
+    async function tryAutoLogin() {
+      try {
+        const res = await fetch(state.apiBase + '/admin/data', {
+          headers: { 'X-Admin-Key': state.apiKey },
+        });
+        if (!res.ok) { render(); return; }
+        applyData(await res.json());
+      } catch {
+        render();
+      }
+    }
+
+    function applyData(data) {
+      state.data  = data;
+      state.dirty = false;
+      // Pick first section + first tag as active
+      const first = data.sections[0] || null;
+      state.activeSectionId = first?.sectionId ?? null;
+      state.activeTagId = (first?.type === 'galleryWithTags')
+        ? (first.tags[0]?.tagId ?? null)
+        : null;
+      render();
+    }
+
+    function logout() {
+      sessionStorage.removeItem('apiBase');
+      sessionStorage.removeItem('apiKey');
+      Object.assign(state, {
+        apiKey: '', apiBase: '', data: null,
+        dirty: false, activeSectionId: null, activeTagId: null,
+        statusMsg: '', statusError: false,
+      });
+      render();
+    }
+
+    // =====================================================================
+    // Section navigation
+    // =====================================================================
+    function setActiveSection(sectionId) {
+      state.activeSectionId = sectionId;
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      state.activeTagId = (s?.type === 'galleryWithTags')
+        ? (s.tags[0]?.tagId ?? null)
+        : null;
+      render();
+    }
+
+    function setActiveTag(tagId) {
+      state.activeTagId = tagId;
+      render();
+    }
+
+    // =====================================================================
+    // Section CRUD
+    // =====================================================================
+    function addSection() {
+      const label = prompt('New section name:')?.trim();
+      if (!label) return;
+      const sectionId = slugify(label);
+      if (!sectionId) { alert('Invalid section name.'); return; }
+      if (state.data.sections.find(s => s.sectionId === sectionId)) {
+        alert('A section with that ID already exists.'); return;
+      }
+      state.data.sections.push({ type: 'galleryWithTags', label, sectionId, tags: [] });
+      state.dirty = true;
+      setActiveSection(sectionId);
+    }
+
+    function renameSection(sectionId) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      if (!s) return;
+      const label = prompt('New label for section (ID stays the same):', s.label)?.trim();
+      if (!label || label === s.label) return;
+      s.label = label;
+      state.dirty = true;
+      render();
+    }
+
+    function deleteSection(sectionId) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      if (!confirm(`Delete section "${s?.label || sectionId}"? This cannot be undone.`)) return;
+      const idx = state.data.sections.findIndex(x => x.sectionId === sectionId);
+      if (idx === -1) return;
+      state.data.sections.splice(idx, 1);
+      state.dirty = true;
+      if (state.activeSectionId === sectionId) {
+        const next = state.data.sections[Math.min(idx, state.data.sections.length - 1)];
+        state.activeSectionId = next?.sectionId ?? null;
+        state.activeTagId = (next?.type === 'galleryWithTags')
+          ? (next.tags[0]?.tagId ?? null)
+          : null;
+      }
+      render();
+    }
+
+    // =====================================================================
+    // Tag CRUD
+    // =====================================================================
+    function addTag(sectionId) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      if (!s || s.type !== 'galleryWithTags') return;
+      const label = prompt('New tag name:')?.trim();
+      if (!label) return;
+      const tagId = slugify(label);
+      if (!tagId) { alert('Invalid tag name.'); return; }
+      if (s.tags.find(t => t.tagId === tagId)) {
+        alert('A tag with that ID already exists.'); return;
+      }
+      s.tags.push({ label, tagId, items: [] });
+      state.dirty     = true;
+      state.activeTagId = tagId;
+      render();
+    }
+
+    function renameTag(sectionId, tagId) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      const t = s?.tags.find(x => x.tagId === tagId);
+      if (!t) return;
+      const label = prompt('New label for tag (ID stays the same):', t.label)?.trim();
+      if (!label || label === t.label) return;
+      t.label = label;
+      state.dirty = true;
+      render();
+    }
+
+    function deleteTag(sectionId, tagId) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      if (!s) return;
+      const t = s.tags.find(x => x.tagId === tagId);
+      if (!confirm(`Delete tag "${t?.label || tagId}"? Images in this tag will be orphaned from the site.`)) return;
+      const idx = s.tags.findIndex(x => x.tagId === tagId);
+      if (idx === -1) return;
+      s.tags.splice(idx, 1);
+      state.dirty = true;
+      if (state.activeTagId === tagId) {
+        state.activeTagId = s.tags[Math.min(idx, s.tags.length - 1)]?.tagId ?? null;
+      }
+      render();
+    }
+
+    // =====================================================================
+    // Image helpers
+    // =====================================================================
+    function getItems(section, tagId) {
+      if (section.type === 'galleryWithTags') {
+        return section.tags.find(t => t.tagId === tagId)?.items ?? null;
+      }
+      // gallery
+      if (!section.items) section.items = [];
+      return section.items;
+    }
+
+    function moveImage(sectionId, tagIdRaw, idx, dir) {
+      const tagId = normTag(tagIdRaw);
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      const items = getItems(s, tagId);
+      if (!items) return;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= items.length) return;
+      [items[idx], items[newIdx]] = [items[newIdx], items[idx]];
+      state.dirty = true;
+      render();
+    }
+
+    async function deleteImage(sectionId, tagIdRaw, idx, fileName) {
+      if (!confirm(`Delete image "${fileName}"?`)) return;
+      const tagId = normTag(tagIdRaw);
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      const items = getItems(s, tagId);
+      if (!items) return;
+      const [removed] = items.splice(idx, 1);
+      if (localPreviews[removed.itemId]) {
+        URL.revokeObjectURL(localPreviews[removed.itemId]);
+        delete localPreviews[removed.itemId];
+      }
+      state.dirty = true;
+      render();
+      // Immediately delete from S3 (fire-and-forget; data.json updated on Save)
+      try {
+        await apiFetch('DELETE', '/admin/image/' + encodeURIComponent(fileName));
+      } catch (err) {
+        setStatus('Warning: S3 delete failed \u2014 ' + err.message, true);
+      }
+    }
+
+    // =====================================================================
+    // Upload — gallery images
+    // =====================================================================
+    function triggerFileInput(sectionId, tagIdRaw) {
+      pendingUploadTarget = { sectionId, tagId: normTag(tagIdRaw) };
+      document.getElementById('fileInput').click();
+    }
+
+    function triggerInfoImageInput(sectionId) {
+      pendingUploadTarget = { infoSection: true, sectionId };
+      document.getElementById('fileInput').click();
+    }
+
+    async function handleDrop(e, sectionId, tagIdRaw) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      await handleGalleryFiles(Array.from(e.dataTransfer.files), sectionId, normTag(tagIdRaw));
+    }
+
+    async function handleGalleryFiles(files, sectionId, tagId) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      if (!s) return;
+
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) {
+          setStatus(`Skipped non-image file: ${file.name}`, true);
+          continue;
+        }
+        setStatus(`Uploading ${file.name}\u2026`);
+        try {
+          const lqip = await generateLqip(file);
+
+          const presignRes = await apiFetch('POST', '/admin/presign', { fileName: file.name });
+          if (!presignRes.ok) {
+            const err = await presignRes.json().catch(() => ({}));
+            throw new Error(err.error || `Presign failed (${presignRes.status})`);
+          }
+          const { url } = await presignRes.json();
+
+          const putRes = await fetch(url, {
+            method: 'PUT',
+            body: file,
+            headers: { 'Content-Type': file.type },
+          });
+          if (!putRes.ok) throw new Error(`S3 upload failed (${putRes.status})`);
+
+          const itemId = genId();
+          const newItem = { fileName: file.name, itemId, urlString: itemId, lqip };
+          localPreviews[itemId] = URL.createObjectURL(file);
+
+          const items = getItems(s, tagId);
+          if (items) {
+            items.push(newItem);
+          } else {
+            setStatus(`Tag not found \u2014 could not add ${file.name}.`, true);
+            continue;
+          }
+          state.dirty = true;
+          render();
+        } catch (err) {
+          setStatus(`Upload failed for ${file.name}: ${err.message}`, true);
+        }
+      }
+      if (!state.statusError) setStatus('Upload complete.');
+    }
+
+    async function handleInfoImageFiles(files, sectionId) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      if (!s) return;
+      const file = files[0];
+      if (!file || !file.type.startsWith('image/')) {
+        setStatus('Please select a valid image file.', true);
+        return;
+      }
+      setStatus('Uploading info image\u2026');
+      try {
+        const lqip = await generateLqip(file);
+
+        const presignRes = await apiFetch('POST', '/admin/presign', { fileName: file.name });
+        if (!presignRes.ok) throw new Error(`Presign failed (${presignRes.status})`);
+        const { url } = await presignRes.json();
+
+        const putRes = await fetch(url, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type },
+        });
+        if (!putRes.ok) throw new Error(`S3 upload failed (${putRes.status})`);
+
+        // Delete old image immediately (best-effort)
+        if (s.imageId && s.imageId !== file.name) {
+          apiFetch('DELETE', '/admin/image/' + encodeURIComponent(s.imageId)).catch(() => {});
+        }
+
+        s.imageId = file.name;
+        s.lqip    = lqip;
+        if (localPreviews['_info_' + sectionId]) {
+          URL.revokeObjectURL(localPreviews['_info_' + sectionId]);
+        }
+        localPreviews['_info_' + sectionId] = URL.createObjectURL(file);
+
+        state.dirty = true;
+        render();
+        setStatus('Info image updated.');
+      } catch (err) {
+        setStatus('Upload failed: ' + err.message, true);
+      }
+    }
+
+    // =====================================================================
+    // Save
+    // =====================================================================
+    async function saveData() {
+      setStatus('Saving\u2026');
+      try {
+        const res = await apiFetch('PUT', '/admin/data', state.data);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Save failed (${res.status})`);
+        }
+        state.dirty = false;
+        setStatus('Saved.');
+        renderTopBar();
+      } catch (err) {
+        setStatus('Save failed: ' + err.message, true);
+      }
+    }
+
+    // =====================================================================
+    // Info text — partial update (no full re-render to keep focus)
+    // =====================================================================
+    function updateInfoText(sectionId, value) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      if (s) {
+        s.text      = value;
+        state.dirty = true;
+        renderTopBar();
+      }
+    }
+
+    // =====================================================================
+    // Render — full
+    // =====================================================================
+    function render() {
+      const app = document.getElementById('app');
+      if (!state.data) {
+        app.innerHTML = renderLoginHTML();
+        return;
+      }
+      app.innerHTML = `
+        <div class="layout">
+          <div class="topbar" id="topbar">${renderTopBarInner()}</div>
+          <div class="body">
+            <div class="sidebar">${renderSidebarInner()}</div>
+            <div class="main">${renderMainInner()}</div>
+          </div>
+        </div>
+      `;
+      // Re-bind file input after each render
+      document.getElementById('fileInput').onchange = async (e) => {
+        if (!pendingUploadTarget) return;
+        const target        = pendingUploadTarget;
+        pendingUploadTarget = null;
+        const files         = Array.from(e.target.files);
+        e.target.value      = '';
+        if (target.infoSection) {
+          await handleInfoImageFiles(files, target.sectionId);
+        } else {
+          await handleGalleryFiles(files, target.sectionId, target.tagId);
+        }
+      };
+    }
+
+    // =====================================================================
+    // Render — topbar only (status / dirty updates)
+    // =====================================================================
+    function renderTopBar() {
+      const el = document.getElementById('topbar');
+      if (el) el.innerHTML = renderTopBarInner();
+    }
+
+    function renderTopBarInner() {
+      return `
+        <span class="topbar-title">Palavara Admin</span>
+        <button class="btn-save ${state.dirty ? 'dirty' : ''}" onclick="saveData()">
+          ${state.dirty ? 'Save Changes' : 'Saved'}
+        </button>
+        <span class="topbar-status ${state.statusError ? 'error' : ''}">${esc(state.statusMsg)}</span>
+        <button class="btn-logout" onclick="logout()">Logout</button>
+      `;
+    }
+
+    // =====================================================================
+    // Render — sidebar
+    // =====================================================================
+    function renderSidebarInner() {
+      let html = '';
+      for (const s of state.data.sections) {
+        const active = s.sectionId === state.activeSectionId;
+        html += `
+          <div class="sidebar-section">
+            <div class="section-row ${active ? 'active' : ''}"
+                 onclick="setActiveSection('${esc(s.sectionId)}')">
+              <span class="section-label">${esc(s.label)}</span>
+              <span class="type-badge">${esc(s.type)}</span>
+              <div class="row-actions">
+                <button title="Rename"
+                        onclick="event.stopPropagation(); renameSection('${esc(s.sectionId)}')">&#9998;</button>
+                <button title="Delete" class="del"
+                        onclick="event.stopPropagation(); deleteSection('${esc(s.sectionId)}')">&#10005;</button>
+              </div>
+            </div>
+            ${active && s.type === 'galleryWithTags' ? renderTagListInner(s) : ''}
+          </div>
+        `;
+      }
+      html += `<button class="add-section-btn" onclick="addSection()">+ Add section</button>`;
+      return html;
+    }
+
+    function renderTagListInner(section) {
+      let html = '<div class="tag-list">';
+      for (const t of section.tags) {
+        const active = t.tagId === state.activeTagId;
+        html += `
+          <div class="tag-row ${active ? 'active' : ''}"
+               onclick="setActiveTag('${esc(t.tagId)}')">
+            <span class="tag-label">${esc(t.label)}</span>
+            <div class="row-actions">
+              <button title="Rename"
+                      onclick="event.stopPropagation(); renameTag('${esc(section.sectionId)}','${esc(t.tagId)}')">&#9998;</button>
+              <button title="Delete" class="del"
+                      onclick="event.stopPropagation(); deleteTag('${esc(section.sectionId)}','${esc(t.tagId)}')">&#10005;</button>
+            </div>
+          </div>
+        `;
+      }
+      html += `<button class="add-tag-btn"
+                       onclick="event.stopPropagation(); addTag('${esc(section.sectionId)}')">
+                 + Add tag
+               </button>`;
+      html += '</div>';
+      return html;
+    }
+
+    // =====================================================================
+    // Render — main area
+    // =====================================================================
+    function renderMainInner() {
+      if (!state.activeSectionId) {
+        return '<div class="main-empty">Select a section from the sidebar.</div>';
+      }
+      const s = state.data.sections.find(x => x.sectionId === state.activeSectionId);
+      if (!s) return '<div class="main-empty">Section not found.</div>';
+
+      if (s.type === 'info')             return renderInfoEditor(s);
+      if (s.type === 'galleryWithTags')  return renderGalleryWithTags(s);
+      if (s.type === 'gallery')          return renderGallery(s);
+      return `<div class="main-empty">Unknown section type: ${esc(s.type)}</div>`;
+    }
+
+    function renderInfoEditor(s) {
+      const imgBase = window.location.origin + '/img/';
+      const imgSrc  = localPreviews['_info_' + s.sectionId]
+                   || (s.imageId ? imgBase + s.imageId : '');
+      return `
+        <div class="info-editor">
+          <h2>${esc(s.label)}</h2>
+          <div class="info-image-row">
+            ${imgSrc
+              ? `<img class="info-img" src="${esc(imgSrc)}" alt="Info image">`
+              : `<div class="info-no-img">No image</div>`}
+            <div>
+              <button class="btn-replace"
+                      onclick="triggerInfoImageInput('${esc(s.sectionId)}')">
+                Replace Image
+              </button>
+            </div>
+          </div>
+          <div class="info-text-label">About text</div>
+          <textarea class="info-textarea"
+                    oninput="updateInfoText('${esc(s.sectionId)}', this.value)"
+          >${esc(s.text || '')}</textarea>
+          <p class="hint">Changes are saved to S3 only when you click "Save Changes" above.</p>
+        </div>
+      `;
+    }
+
+    function renderGalleryWithTags(s) {
+      let html = '';
+      if (s.tags.length === 0) {
+        html += '<p style="color:#aaa;font-size:13px;margin-bottom:16px;">No tags yet \u2014 add one in the sidebar.</p>';
+      } else {
+        html += '<div class="tag-tabs">';
+        for (const t of s.tags) {
+          html += `<button class="tag-tab ${t.tagId === state.activeTagId ? 'active' : ''}"
+                           onclick="setActiveTag('${esc(t.tagId)}')">${esc(t.label)}</button>`;
+        }
+        html += '</div>';
+      }
+
+      if (state.activeTagId) {
+        const t = s.tags.find(x => x.tagId === state.activeTagId);
+        if (t) html += renderImageGrid(t.items || [], s.sectionId, t.tagId);
+      }
+      return html;
+    }
+
+    function renderGallery(s) {
+      if (!s.items) s.items = [];
+      return renderImageGrid(s.items, s.sectionId, null);
+    }
+
+    function renderImageGrid(items, sectionId, tagId) {
+      const imgBase  = window.location.origin + '/img/';
+      // tagId string passed into onclick attributes
+      const tagIdStr = tagId === null ? 'null' : esc(tagId);
+
+      let html = '<div class="image-grid">';
+
+      items.forEach((item, idx) => {
+        const src = localPreviews[item.itemId] || imgBase + item.fileName;
+        html += `
+          <div class="image-card">
+            <img src="${esc(src)}" alt="${esc(item.fileName)}" loading="lazy"
+                 onerror="this.style.background='#ddd';this.removeAttribute('src')">
+            <div class="image-filename" title="${esc(item.fileName)}">${esc(item.fileName)}</div>
+            <div class="image-actions">
+              <button title="Move left"
+                      onclick="moveImage('${esc(sectionId)}','${tagIdStr}',${idx},-1)"
+                      ${idx === 0 ? 'disabled' : ''}>&#8592;</button>
+              <button title="Move right"
+                      onclick="moveImage('${esc(sectionId)}','${tagIdStr}',${idx},1)"
+                      ${idx === items.length - 1 ? 'disabled' : ''}>&#8594;</button>
+              <button title="Delete" class="del-img"
+                      onclick="deleteImage('${esc(sectionId)}','${tagIdStr}',${idx},'${esc(item.fileName)}')">&#10005;</button>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+        <div class="upload-zone"
+             onclick="triggerFileInput('${esc(sectionId)}','${tagIdStr}')"
+             ondragenter="this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondragover="event.preventDefault()"
+             ondrop="handleDrop(event,'${esc(sectionId)}','${tagIdStr}')">
+          <span>Drop images here<br>or click to upload</span>
+        </div>
+      `;
+
+      html += '</div>';
+      return html;
+    }
+
+    // =====================================================================
+    // Render — login
+    // =====================================================================
+    function renderLoginHTML() {
+      return `
+        <div class="login-wrap">
+          <div class="login-box">
+            <h1>Palavara Admin</h1>
+            <form onsubmit="handleLogin(event)">
+              <label>API Gateway URL
+                <input type="url" id="inputApiBase"
+                       value="${esc(state.apiBase)}"
+                       placeholder="https://data.palavara.com"
+                       autocomplete="url" required>
+              </label>
+              <label>Admin Key
+                <input type="password" id="inputApiKey"
+                       value="${esc(state.apiKey)}"
+                       autocomplete="current-password" required>
+              </label>
+              <div id="loginError" class="login-error"></div>
+              <button type="submit" id="loginBtn">Login</button>
+            </form>
+          </div>
+        </div>
+      `;
+    }
+
+    // =====================================================================
+    // Boot
+    // =====================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      if (state.apiKey && state.apiBase) {
+        tryAutoLogin();
+      } else {
+        render();
+      }
+    });
+  </script>
+</body>
+</html>
