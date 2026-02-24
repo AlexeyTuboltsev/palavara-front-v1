@@ -91,6 +91,7 @@ type alias ItemContentData =
     , urlString : String
     , onClickMessage : Msg
     , isActive : Bool
+    , lqip : String
     }
 
 
@@ -99,12 +100,14 @@ type alias ActiveItemContentData =
     , urlString : String
     , prevRoute : Maybe Msg
     , nextRoute : Maybe Msg
+    , lqip : String
     }
 
 
 type alias InfoContentData =
     { urlString : String
     , text : String
+    , lqip : String
     }
 
 
@@ -301,12 +304,13 @@ generateGalleryContentData apiUrl nextRoute items =
             GoToRoute <| nextRoute itemId
     in
     List.map
-        (\{ itemId, urlString, fileName } ->
+        (\{ itemId, fileName, lqip } ->
             ItemContentData
                 itemId
                 (apiUrl ++ fileName)
                 (onClickMessage itemId)
                 False
+                lqip
         )
         items
         |> GalleryContentDataType
@@ -320,12 +324,13 @@ generateGalleryItemContentData apiUrl nextRoute activeItem items =
 
         itemDataList =
             List.map
-                (\{ itemId, urlString, fileName  } ->
+                (\{ itemId, fileName, lqip } ->
                     ItemContentData
                         itemId
                         (apiUrl ++ fileName)
                         (onClickMessage itemId)
                         (itemId == activeItem.itemId)
+                        lqip
                 )
                 items
 
@@ -340,7 +345,7 @@ generateGalleryItemContentData apiUrl nextRoute activeItem items =
                 |> Maybe.andThen (\{ itemId } -> Just <| onClickMessage itemId)
 
         activeItemData =
-            ActiveItemContentData activeItem.itemId (apiUrl ++ activeItem.fileName) prevOnClick nextOnClick
+            ActiveItemContentData activeItem.itemId (apiUrl ++ activeItem.fileName) prevOnClick nextOnClick activeItem.lqip
     in
     GalleryImageContentDataType itemDataList activeItemData
 
@@ -361,21 +366,22 @@ generateMobileGalleryItemContentData apiUrl sliderHeight nextRoute activeItemId 
 
         itemDataList =
             List.map
-                 (\{ itemId, urlString, fileName  } ->
+                (\{ itemId, fileName, lqip } ->
                     ItemContentData
                         itemId
                         (apiUrl ++ fileName)
                         (onClickMessage itemId)
                         (itemId == activeItemId)
+                        lqip
                 )
                 items
     in
     MobileGalleryContentDataType itemDataList activeItemIndex sliderHeight topOffset Nothing False
 
 
-generateInfoContentData : String -> String -> String -> InfoContentData
-generateInfoContentData text apiUrl imageId =
-    InfoContentData (apiUrl ++ imageId) text
+generateInfoContentData : String -> String -> String -> String -> InfoContentData
+generateInfoContentData text apiUrl imageId lqip =
+    InfoContentData (apiUrl ++ imageId) text lqip
 
 
 -- UTILS --

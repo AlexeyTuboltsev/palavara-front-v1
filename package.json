@@ -10,7 +10,8 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "start": "node scripts/start.js",
+    "start": "NODE_OPTIONS=--openssl-legacy-provider PORT=3001 node scripts/start.js",
+    "backend": "node scripts/dev-backend.js",
     "package": "elm-package",
     "make": "elm-make",
     "repl": "elm-repl",
@@ -20,7 +21,8 @@
     "prod": "webpack -p",
     "analyse": "elm-analyse -s -p 3001 -o",
     "deploy": "npm run build && scripts/deploy.sh",
-    "deploy-production": "npm run build && scripts/deploy-prod.sh"
+    "deploy-production": "npm run build && scripts/deploy-prod.sh",
+    "generate-lqip": "node scripts/generate-lqip.js"
   },
   "license": "MIT",
   "devDependencies": {
@@ -48,6 +50,7 @@
     "sass": "^1.69.5",
     "sass-loader": "^8.0.0",
     "serve": "^11.2.0",
+    "sharp": "^0.34.5",
     "style-loader": "^1.0.0",
     "sw-precache-webpack-plugin": "^0.11.5",
     "terser-webpack-plugin": "^2.3.1",
