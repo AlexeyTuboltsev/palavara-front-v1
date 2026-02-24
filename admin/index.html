@@ -421,6 +421,163 @@
     .info-textarea:focus { outline: none; border-color: #888; }
 
     .hint { font-size: 12px; color: #aaa; margin-top: 20px; }
+
+    /* ── Tag tabs bar (tabs + manage button) ── */
+    .tag-tabs-bar {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .tag-tabs-bar .tag-tabs { flex: 1; margin-bottom: 0; }
+
+    .btn-manage-subs {
+      padding: 6px 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 12px;
+      background: #fff;
+      color: #666;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .btn-manage-subs:hover { background: #f0f0f0; color: #333; }
+
+    /* ── Section editor ── */
+    .section-editor { max-width: 560px; }
+
+    .section-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .section-editor-header h2 { font-size: 17px; font-weight: 600; }
+
+    .btn-back {
+      padding: 6px 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+      background: #fff;
+      color: #555;
+    }
+
+    .btn-back:hover { background: #f0f0f0; }
+
+    .tag-editor-list {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .tag-editor-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      background: #fff;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .tag-editor-row:last-child { border-bottom: none; }
+
+    .tag-move-btns { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+
+    .tag-move-btns button {
+      width: 22px;
+      height: 18px;
+      border-radius: 2px;
+      font-size: 10px;
+      color: #bbb;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tag-move-btns button:hover:not(:disabled) { background: #eee; color: #333; }
+    .tag-move-btns button:disabled { color: #e0e0e0; cursor: default; }
+
+    .tag-name-input {
+      flex: 1;
+      padding: 5px 8px;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      font-size: 14px;
+      background: transparent;
+      min-width: 0;
+    }
+
+    .tag-name-input:hover { border-color: #ddd; background: #fafafa; }
+    .tag-name-input:focus { outline: none; border-color: #888; background: #fff; }
+
+    .tag-id-badge {
+      font-size: 11px;
+      color: #bbb;
+      font-family: monospace;
+      flex-shrink: 0;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tag-del-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 3px;
+      color: #ccc;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .tag-del-btn:hover { background: #fde8e8; color: #c0392b; }
+
+    .tag-editor-empty {
+      padding: 20px;
+      text-align: center;
+      color: #bbb;
+      font-size: 13px;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+
+    .tag-add-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .tag-add-row input {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .tag-add-row input:focus { outline: none; border-color: #888; }
+
+    .btn-add-subsection {
+      padding: 8px 16px;
+      background: #333;
+      color: #fff;
+      border-radius: 4px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .btn-add-subsection:hover { background: #111; }
   </style>
 </head>
 <body>
@@ -438,6 +595,7 @@
       dirty:           false,
       activeSectionId: null,
       activeTagId:     null,
+      sectionEditMode: false,
       statusMsg:       '',
       statusError:     false,
     };
@@ -540,7 +698,7 @@
 
       errEl.textContent = '';
       btn.disabled      = true;
-      btn.textContent   = 'Logging in\u2026';
+      btn.textContent   = 'Logging in…';
 
       try {
         const res = await fetch(apiBase + '/admin/data', {
@@ -583,6 +741,7 @@
     function applyData(data) {
       state.data  = data;
       state.dirty = false;
+      state.sectionEditMode = false;
       // Pick first section + first tag as active
       const first = data.sections[0] || null;
       state.activeSectionId = first?.sectionId ?? null;
@@ -608,6 +767,7 @@
     // =====================================================================
     function setActiveSection(sectionId) {
       state.activeSectionId = sectionId;
+      state.sectionEditMode = false;
       const s = state.data.sections.find(x => x.sectionId === sectionId);
       state.activeTagId = (s?.type === 'galleryWithTags')
         ? (s.tags[0]?.tagId ?? null)
@@ -709,6 +869,56 @@
     }
 
     // =====================================================================
+    // Section editor helpers
+    // =====================================================================
+    function enterSectionEditMode() {
+      state.sectionEditMode = true;
+      render();
+    }
+
+    function exitSectionEditMode() {
+      state.sectionEditMode = false;
+      render();
+    }
+
+    function moveTag(sectionId, idx, dir) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      if (!s || s.type !== 'galleryWithTags') return;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= s.tags.length) return;
+      [s.tags[idx], s.tags[newIdx]] = [s.tags[newIdx], s.tags[idx]];
+      state.dirty = true;
+      render();
+    }
+
+    function setTagLabel(sectionId, tagId, value) {
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      const t = s?.tags.find(x => x.tagId === tagId);
+      if (t) {
+        t.label = value;
+        state.dirty = true;
+        renderTopBar();
+      }
+    }
+
+    function addTagFromEditor(sectionId) {
+      const input = document.getElementById('newTagNameInput');
+      const label = input?.value.trim();
+      if (!label) return;
+      const tagId = slugify(label);
+      if (!tagId) { setStatus('Invalid name — use letters, numbers, or spaces.', true); return; }
+      const s = state.data.sections.find(x => x.sectionId === sectionId);
+      if (!s) return;
+      if (s.tags.find(t => t.tagId === tagId)) {
+        setStatus('A subsection with that name already exists.', true); return;
+      }
+      s.tags.push({ label, tagId, items: [] });
+      state.dirty = true;
+      render();
+      document.getElementById('newTagNameInput')?.focus();
+    }
+
+    // =====================================================================
     // Image helpers
     // =====================================================================
     function getItems(section, tagId) {
@@ -749,7 +959,7 @@
       try {
         await apiFetch('DELETE', '/admin/image/' + encodeURIComponent(fileName));
       } catch (err) {
-        setStatus('Warning: S3 delete failed \u2014 ' + err.message, true);
+        setStatus('Warning: S3 delete failed — ' + err.message, true);
       }
     }
 
@@ -781,7 +991,7 @@
           setStatus(`Skipped non-image file: ${file.name}`, true);
           continue;
         }
-        setStatus(`Uploading ${file.name}\u2026`);
+        setStatus(`Uploading ${file.name}…`);
         try {
           const lqip = await generateLqip(file);
 
@@ -807,7 +1017,7 @@
           if (items) {
             items.push(newItem);
           } else {
-            setStatus(`Tag not found \u2014 could not add ${file.name}.`, true);
+            setStatus(`Tag not found — could not add ${file.name}.`, true);
             continue;
           }
           state.dirty = true;
@@ -827,7 +1037,7 @@
         setStatus('Please select a valid image file.', true);
         return;
       }
-      setStatus('Uploading info image\u2026');
+      setStatus('Uploading info image…');
       try {
         const lqip = await generateLqip(file);
 
@@ -866,7 +1076,7 @@
     // Save
     // =====================================================================
     async function saveData() {
-      setStatus('Saving\u2026');
+      setStatus('Saving…');
       try {
         const res = await apiFetch('PUT', '/admin/data', state.data);
         if (!res.ok) {
@@ -960,9 +1170,9 @@
               <span class="type-badge">${esc(s.type)}</span>
               <div class="row-actions">
                 <button title="Rename"
-                        onclick="event.stopPropagation(); renameSection('${esc(s.sectionId)}')">&#9998;</button>
+                        onclick="event.stopPropagation(); renameSection('${esc(s.sectionId)}')">✎</button>
                 <button title="Delete" class="del"
-                        onclick="event.stopPropagation(); deleteSection('${esc(s.sectionId)}')">&#10005;</button>
+                        onclick="event.stopPropagation(); deleteSection('${esc(s.sectionId)}')">✕</button>
               </div>
             </div>
             ${active && s.type === 'galleryWithTags' ? renderTagListInner(s) : ''}
@@ -983,9 +1193,9 @@
             <span class="tag-label">${esc(t.label)}</span>
             <div class="row-actions">
               <button title="Rename"
-                      onclick="event.stopPropagation(); renameTag('${esc(section.sectionId)}','${esc(t.tagId)}')">&#9998;</button>
+                      onclick="event.stopPropagation(); renameTag('${esc(section.sectionId)}','${esc(t.tagId)}')">✎</button>
               <button title="Delete" class="del"
-                      onclick="event.stopPropagation(); deleteTag('${esc(section.sectionId)}','${esc(t.tagId)}')">&#10005;</button>
+                      onclick="event.stopPropagation(); deleteTag('${esc(section.sectionId)}','${esc(t.tagId)}')">✕</button>
             </div>
           </div>
         `;
@@ -1042,15 +1252,21 @@
     }
 
     function renderGalleryWithTags(s) {
+      if (state.sectionEditMode) return renderSectionEditor(s);
+
       let html = '';
       if (s.tags.length === 0) {
-        html += '<p style="color:#aaa;font-size:13px;margin-bottom:16px;">No tags yet \u2014 add one in the sidebar.</p>';
+        html += `<p style="color:#aaa;font-size:13px;margin-bottom:16px;">No subsections yet —
+          <button style="color:#555;font-size:13px;text-decoration:underline;cursor:pointer"
+                  onclick="enterSectionEditMode()">add one</button>.</p>`;
       } else {
-        html += '<div class="tag-tabs">';
+        html += '<div class="tag-tabs-bar"><div class="tag-tabs">';
         for (const t of s.tags) {
           html += `<button class="tag-tab ${t.tagId === state.activeTagId ? 'active' : ''}"
                            onclick="setActiveTag('${esc(t.tagId)}')">${esc(t.label)}</button>`;
         }
+        html += '</div>';
+        html += `<button class="btn-manage-subs" onclick="enterSectionEditMode()">Manage subsections</button>`;
         html += '</div>';
       }
 
@@ -1064,6 +1280,54 @@
     function renderGallery(s) {
       if (!s.items) s.items = [];
       return renderImageGrid(s.items, s.sectionId, null);
+    }
+
+    function renderSectionEditor(s) {
+      let rows = '';
+      if (s.tags.length === 0) {
+        rows = '<div class="tag-editor-empty">No subsections yet. Add one below.</div>';
+      } else {
+        rows = '<div class="tag-editor-list">';
+        s.tags.forEach((t, idx) => {
+          rows += `
+            <div class="tag-editor-row">
+              <div class="tag-move-btns">
+                <button title="Move up"
+                        onclick="moveTag('${esc(s.sectionId)}',${idx},-1)"
+                        ${idx === 0 ? 'disabled' : ''}>&#9650;</button>
+                <button title="Move down"
+                        onclick="moveTag('${esc(s.sectionId)}',${idx},1)"
+                        ${idx === s.tags.length - 1 ? 'disabled' : ''}>&#9660;</button>
+              </div>
+              <input class="tag-name-input" type="text"
+                     value="${esc(t.label)}"
+                     oninput="setTagLabel('${esc(s.sectionId)}','${esc(t.tagId)}',this.value)"
+                     title="Edit subsection label">
+              <span class="tag-id-badge" title="Permanent ID: ${esc(t.tagId)}">${esc(t.tagId)}</span>
+              <button class="tag-del-btn" title="Delete subsection"
+                      onclick="deleteTag('${esc(s.sectionId)}','${esc(t.tagId)}')">&#10005;</button>
+            </div>
+          `;
+        });
+        rows += '</div>';
+      }
+      return `
+        <div class="section-editor">
+          <div class="section-editor-header">
+            <h2>Subsections &mdash; ${esc(s.label)}</h2>
+            <button class="btn-back" onclick="exitSectionEditMode()">&#8592; Back to images</button>
+          </div>
+          ${rows}
+          <div class="tag-add-row">
+            <input type="text" id="newTagNameInput"
+                   placeholder="New subsection name&hellip;"
+                   onkeydown="if(event.key==='Enter')addTagFromEditor('${esc(s.sectionId)}')">
+            <button class="btn-add-subsection"
+                    onclick="addTagFromEditor('${esc(s.sectionId)}')">Add subsection</button>
+          </div>
+          <p class="hint">The grey ID is permanent &mdash; renaming a label never changes the URL.</p>
+        </div>
+      `;
     }
 
     function renderImageGrid(items, sectionId, tagId) {
