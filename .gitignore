@@ -16,3 +16,7 @@ node_modules
 .idea
 
 .env
+
+# Local dev backend data
+mock-data/
+.firecrawl/
