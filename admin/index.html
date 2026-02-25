@@ -1335,7 +1335,16 @@
       // tagId string passed into onclick attributes
       const tagIdStr = tagId === null ? 'null' : esc(tagId);
 
-      let html = '<div class="image-grid">';
+      let html = `<div class="image-grid">
+        <div class="upload-zone"
+             onclick="triggerFileInput('${esc(sectionId)}','${tagIdStr}')"
+             ondragenter="this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondragover="event.preventDefault()"
+             ondrop="handleDrop(event,'${esc(sectionId)}','${tagIdStr}')">
+          <span>Drop images here<br>or click to upload</span>
+        </div>
+      `;
 
       items.forEach((item, idx) => {
         const src = localPreviews[item.itemId] || imgBase + item.fileName;
@@ -1357,17 +1366,6 @@
           </div>
         `;
       });
-
-      html += `
-        <div class="upload-zone"
-             onclick="triggerFileInput('${esc(sectionId)}','${tagIdStr}')"
-             ondragenter="this.classList.add('drag-over')"
-             ondragleave="this.classList.remove('drag-over')"
-             ondragover="event.preventDefault()"
-             ondrop="handleDrop(event,'${esc(sectionId)}','${tagIdStr}')">
-          <span>Drop images here<br>or click to upload</span>
-        </div>
-      `;
 
       html += '</div>';
       return html;
