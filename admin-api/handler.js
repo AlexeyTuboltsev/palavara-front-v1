@@ -38,6 +38,9 @@ const FILENAME_RE = /^[\w\-. ]+\.(jpg|jpeg|png|gif|webp)$/i;
 export async function handler(event) {
   const method = event.httpMethod || event.requestContext?.http?.method;
   const path = event.path || event.rawPath || '';
+  const rawBody = event.isBase64Encoded
+    ? Buffer.from(event.body || '', 'base64').toString('utf-8')
+    : (event.body || '');
 
   if (method === 'OPTIONS') return respond(200, '');
   if (!isAuth(event)) return respond(401, { error: 'Unauthorized' });
@@ -52,7 +55,7 @@ export async function handler(event) {
 
     // PUT /admin/data
     if (method === 'PUT' && path === '/admin/data') {
-      const data = JSON.parse(event.body);
+      const data = JSON.parse(rawBody);
       if (!Array.isArray(data.sections)) {
         return respond(400, { error: 'Invalid data: sections must be an array' });
       }
@@ -77,7 +80,7 @@ export async function handler(event) {
 
     // POST /admin/presign
     if (method === 'POST' && path === '/admin/presign') {
-      const { fileName } = JSON.parse(event.body);
+      const { fileName } = JSON.parse(rawBody);
       if (!fileName || !FILENAME_RE.test(fileName) || fileName.includes('/')) {
         return respond(400, { error: 'Invalid fileName' });
       }
