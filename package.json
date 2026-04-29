@@ -9,7 +9,7 @@
     "url": "git+https://github.com/simonh1000/elm-webpack-starter.git"
   },
   "scripts": {
-    "build": "node scripts/build.js",
+    "build": "node scripts/build.js && node scripts/prerender-routes.js",
     "start": "NODE_OPTIONS=--openssl-legacy-provider PORT=3001 node scripts/start.js",
     "backend": "node scripts/dev-backend.js",
     "package": "elm-package",
