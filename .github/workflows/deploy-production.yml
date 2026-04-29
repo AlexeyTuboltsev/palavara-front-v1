@@ -1,0 +1,43 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build
+        # Webpack is on v4, which uses old OpenSSL APIs that node 17+
+        # rejects without this flag. Same flag the local `yarn build`
+        # script uses. The build also runs scripts/prerender-routes.js
+        # which fetches AppData from data.palavara.com over HTTPS — the
+        # CI runner has internet egress so this works without further
+        # config.
+        run: NODE_OPTIONS=--openssl-legacy-provider yarn build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: Deploy to S3 + invalidate CloudFront
+        env:
+          BUCKET_NAME_PROD: ${{ secrets.BUCKET_NAME_PROD }}
+          DISTRIBUTION_ID_PROD: ${{ secrets.DISTRIBUTION_ID_PROD }}
+        run: bash scripts/deploy-prod.sh
