@@ -46,11 +46,13 @@ export default defineConfig({
     },
   ],
 
-  // Build once, then serve build/ statically. We don't use the dev
-  // server here — webpack-dev-server hot-reloads and prints log
-  // headers that aren't visually meaningful but make snapshots noisy.
+  // Build once, then serve build/ statically. -s / --single is the
+  // SPA fallback flag — without it, /info, /illustrations etc. would
+  // return 404 because they don't exist as files in build/. With it,
+  // index.html is served for every unmatched path and the Elm app
+  // handles routing client-side.
   webServer: {
-    command: 'NODE_OPTIONS=--openssl-legacy-provider yarn build && npx --yes serve -l 4321 build',
+    command: 'NODE_OPTIONS=--openssl-legacy-provider yarn build && npx --yes serve -s -l 4321 build',
     url: 'http://127.0.0.1:4321',
     reuseExistingServer: !process.env.CI,
     timeout: 180 * 1000,
