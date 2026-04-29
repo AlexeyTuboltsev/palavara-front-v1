@@ -5,27 +5,14 @@ import * as path from 'path';
 /**
  * Visual regression for the artist site.
  *
- * The app makes two kinds of network requests we need to control:
- *  - One JSON GET to https://data.palavara.com/data (AppData).
- *  - Many image GETs to https://data.palavara.com/img/<filename>.
- *
- * Both are intercepted via page.route() so tests run with a fixed
- * fixture and don't depend on remote state. Images are returned as
- * a tiny gray PNG of fixed dimensions — actual artwork variance
- * isn't what we're regression-testing here, layout and chrome are.
+ * AppData is mocked so the rendered structure is deterministic
+ * regardless of what the live data.palavara.com/data backend returns.
+ * Images are allowed through and load from the CDN as in production —
+ * artwork rarely changes and the variance is acceptable.
  */
 
 const fixture = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'fixtures', 'appdata.json'), 'utf8'),
-);
-
-// 50×50 solid #e0e0e0 PNG. Small, deterministic, intrinsic
-// dimensions roughly match a thumbnail tile so layout doesn't
-// cave when an artwork-shaped slot is filled with this image.
-const GRAY_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAOklEQVR42u3OAQ0AAAjDMOZf9DDB' +
-  'IZBIaXfTpEgEEUQQQQQRRBBBBEEEEUQQQQQRRBBBBBFEkBcLRgABaWshPwAAAABJRU5ErkJggg==',
-  'base64',
 );
 
 async function setupMocks(page: Page) {
@@ -38,19 +25,9 @@ async function setupMocks(page: Page) {
     }),
   );
 
-  await page.route('**/data.palavara.com/img/**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'image/png',
-      headers: { 'access-control-allow-origin': '*' },
-      body: GRAY_PNG,
-    }),
-  );
-
-  // Also block analytics so they don't add load-timing variance to the
-  // snapshot. They're fired 4 s after `load` per index.html, so usually
-  // already past our screenshot window — but a slow run could catch
-  // them.
+  // Block analytics so they don't add load-timing variance. They're
+  // fired 4 s after `load` per index.html, usually past our screenshot
+  // window — but a slow run could catch them.
   await page.route('**/googletagmanager.com/**', (route) => route.abort());
   await page.route('**/google-analytics.com/**', (route) => route.abort());
 }
