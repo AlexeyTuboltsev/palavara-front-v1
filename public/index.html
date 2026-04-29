@@ -1,40 +1,84 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-6CCWE55DYZ"></script>
+<!-- Google tag (gtag.js) — deferred so it doesn't block first paint.
+     Same pattern used on studio.palavara.com. -->
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-6CCWE55DYZ');
+  function loadGtag() {
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=G-6CCWE55DYZ';
+    document.head.appendChild(s);
+  }
+  window.addEventListener('load', function () { setTimeout(loadGtag, 4000); });
 </script>
 
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, shrink-to-fit=no"/>
-    <meta name="author" content="Palavara" />
-    <meta name="description" content="Palavara: Book Illustration, Woodcuts, Pottery and Visual Art" />
-    <meta name="keywords" content="Art, Graphics, Woodcuts, Illustration, Pottery" />
+    <meta name="author" content="Varvara Polyakova" />
+    <meta name="description" content="Portfolio of Varvara Polyakova — book illustrations, graphic art, woodcuts and ceramics. Studio in Berlin." />
     <meta name="robots" content="index, follow" />
     <meta name="googlebot" content="index, follow" />
-  
 
-    <meta property="og:title" content="PALAVARA">
-    <meta property="og:description" content="Palavara: Book Illustration, Woodcuts, Pottery and Visual Art">
+    <link rel="canonical" href="https://palavara.com/" />
+
     <meta property="og:type" content="website">
+    <meta property="og:title" content="Varvara Polyakova — Illustrations, Graphics & Ceramics">
+    <meta property="og:description" content="Portfolio of Varvara Polyakova — book illustrations, graphic art, woodcuts and ceramics. Studio in Berlin.">
+    <meta property="og:url" content="https://palavara.com/">
+    <meta property="og:site_name" content="Palavara — Varvara Polyakova">
+    <meta property="og:image" content="https://data.palavara.com/img/0.jpg">
+    <meta property="og:locale" content="en_US">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Varvara Polyakova — Illustrations, Graphics & Ceramics">
+    <meta name="twitter:description" content="Portfolio of Varvara Polyakova — book illustrations, graphic art, woodcuts and ceramics. Studio in Berlin.">
+    <meta name="twitter:image" content="https://data.palavara.com/img/0.jpg">
 
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json">
-    <link href="https://fonts.googleapis.com/css?family=Didact+Gothic&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon/favicon-16x16.png" sizes="16x16">
     <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon/favicon-32x32.png" sizes="32x32">
     <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon/favicon-96x96.png" sizes="96x96">
     <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon/favicon-160x160.png" sizes="160x160">
     <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon/favicon-192x192.png" sizes="192x192">
 
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "@id": "https://palavara.com/#varvara",
+      "name": "Varvara Polyakova",
+      "alternateName": "Varya Polyakova",
+      "jobTitle": "Visual artist, illustrator and ceramicist",
+      "url": "https://palavara.com/",
+      "description": "Visual artist working across book illustration, graphic art, woodcut printmaking and ceramics. Based in Berlin.",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Berlin",
+        "addressCountry": "DE"
+      },
+      "worksFor": {
+        "@type": "LocalBusiness",
+        "@id": "https://studio.palavara.com/#studio",
+        "url": "https://studio.palavara.com/"
+      },
+      "sameAs": [
+        "https://studio.palavara.com/",
+        "https://www.instagram.com/palavara_ceramics/",
+        "https://www.instagram.com/palavara_potterystudio/",
+        "https://www.facebook.com/palavaraceramics/",
+        "https://www.etsy.com/shop/PALAVARA",
+        "https://maps.google.com/?cid=2415610807544414832"
+      ]
+    }
+    </script>
 
-    <title>palavara</title>
+    <title>Varvara Polyakova — Illustrations, Graphics &amp; Ceramics</title>
 </head>
 <body>
     <noscript>
