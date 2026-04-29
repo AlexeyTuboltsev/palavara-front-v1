@@ -20,3 +20,8 @@ node_modules
 # Local dev backend data
 mock-data/
 .firecrawl/
+
+# Playwright visual-regression runtime artifacts (baselines under
+# e2e/...-snapshots/ ARE checked in, just not these run outputs).
+playwright-report/
+test-results/

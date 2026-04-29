@@ -22,10 +22,14 @@
     "analyse": "elm-analyse -s -p 3001 -o",
     "deploy": "npm run build && scripts/deploy.sh",
     "deploy-production": "npm run build && scripts/deploy-prod.sh",
-    "generate-lqip": "node scripts/generate-lqip.js"
+    "generate-lqip": "node scripts/generate-lqip.js",
+    "test:visual": "docker run --rm --user $(id -u):$(id -g) -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.58.0-noble bash -c 'HOME=/tmp NODE_OPTIONS=--openssl-legacy-provider npx playwright test'",
+    "test:visual:update": "docker run --rm --user $(id -u):$(id -g) -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.58.0-noble bash -c 'HOME=/tmp NODE_OPTIONS=--openssl-legacy-provider npx playwright test --update-snapshots=all'",
+    "test:visual:report": "playwright show-report"
   },
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "1.58.0",
     "@babel/core": "^7.7.2",
     "@babel/preset-env": "^7.7.7",
     "assets-webpack-plugin": "^3.9.10",
