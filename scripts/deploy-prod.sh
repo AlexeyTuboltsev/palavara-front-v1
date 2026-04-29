@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 set -e
 
-bucketName="$(dotenv get BUCKET_NAME_PROD)"
-distributionId="$(dotenv get DISTRIBUTION_ID_PROD)"
+# Resolve config. Locally: read from .env via dotenv. In CI: read from
+# environment variables populated from GitHub Secrets. Env wins when set
+# so CI doesn't depend on a checked-in .env (which is gitignored anyway).
+bucketName="${BUCKET_NAME_PROD:-$(dotenv get BUCKET_NAME_PROD 2>/dev/null || true)}"
+distributionId="${DISTRIBUTION_ID_PROD:-$(dotenv get DISTRIBUTION_ID_PROD 2>/dev/null || true)}"
+
+if [ -z "$bucketName" ] || [ -z "$distributionId" ]; then
+  echo "ERROR: BUCKET_NAME_PROD and DISTRIBUTION_ID_PROD must be set (.env locally, secrets in CI)" >&2
+  exit 1
+fi
 
 echo "--deploying to PRODUCTION: $bucketName --"
 
