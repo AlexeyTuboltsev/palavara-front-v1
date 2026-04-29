@@ -1,0 +1,291 @@
+#!/usr/bin/env node
+/**
+ * Post-webpack prerender for SEO.
+ *
+ * The Elm SPA serves the same build/index.html for every route, so
+ * non-JS clients (Googlebot's first pass, Telegram/WhatsApp/Slack/FB
+ * previews, Bing) see the home page's meta tags on every URL —
+ * making them all look like duplicates of /. This script writes a
+ * copy of index.html for each route with the route-specific tags
+ * substituted, so crawlers see the right title/description/canonical
+ * on the first byte.
+ *
+ * Routes covered:
+ *   - /                         (home; left as index.html — webpack already wrote it)
+ *   - /info
+ *   - /<sectionId>              (3: illustrations, graphics, ceramics)
+ *   - /<sectionId>/<tagId>      (14 tag pages)
+ *   - /<sectionId>/<itemId>     (per-artwork canonical URLs)
+ *   - /<sectionId>/<tagId>/<itemId> (per-artwork via tag; canonical points at the
+ *                                    section-image variant when that exists)
+ *
+ * The deploy step (scripts/deploy-prod.sh) uploads each as a key
+ * without the .html extension so CloudFront serves it directly when
+ * the user-facing URL is requested. React still hydrates on top.
+ *
+ * AppData is fetched once at build time. If the network call fails
+ * the build keeps going — the static index.html is still written by
+ * webpack and the SPA fallback at runtime will fetch the latest data
+ * itself.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+
+const SITE_URL = 'https://palavara.com';
+const STUDIO_ID = 'https://studio.palavara.com/#studio';
+const VARYA_ID = `${SITE_URL}/#varvara`;
+const DEFAULT_OG_IMAGE = 'https://data.palavara.com/img/0.jpg';
+const APP_DATA_URL = 'https://data.palavara.com/data';
+
+const buildDir = path.join(__dirname, '..', 'build');
+const indexPath = path.join(buildDir, 'index.html');
+
+// Section.label is plural ("illustrations"). For per-artwork titles
+// we want the singular ("Illustration by Varvara Polyakova").
+const SECTION_SINGULAR = {
+  illustrations: 'Illustration',
+  graphics: 'Graphic',
+  ceramics: 'Ceramic',
+};
+
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { 'User-Agent': 'palavara-prerender/1.0' } }, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+        return;
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(Buffer.concat(chunks).toString()));
+        } catch (e) {
+          reject(e);
+        }
+      });
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+function escapeText(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Replace meta tags + canonical and inject a per-route JSON-LD block.
+ * Fails loudly if any expected pattern doesn't match — silent half-
+ * rewritten files are worse than a build error.
+ */
+function rewriteHtml(template, { title, description, canonical, ogImage, jsonLd }) {
+  const titleText = escapeText(title);
+  const titleAttr = escapeAttr(title);
+  const descAttr = escapeAttr(description);
+  const ogImageAttr = escapeAttr(ogImage);
+
+  const replacements = [
+    [/<title>[^<]*<\/title>/, `<title>${titleText}</title>`],
+    [/<meta name="description" content="[^"]*"\s*\/?>/, `<meta name="description" content="${descAttr}"/>`],
+    [/<link rel="canonical" href="[^"]*"\s*\/?>/, `<link rel="canonical" href="${escapeAttr(canonical)}"/>`],
+    [/<meta property="og:title" content="[^"]*"\s*\/?>/, `<meta property="og:title" content="${titleAttr}">`],
+    [/<meta property="og:description" content="[^"]*"\s*\/?>/, `<meta property="og:description" content="${descAttr}">`],
+    [/<meta property="og:url" content="[^"]*"\s*\/?>/, `<meta property="og:url" content="${escapeAttr(canonical)}">`],
+    [/<meta property="og:image" content="[^"]*"\s*\/?>/, `<meta property="og:image" content="${ogImageAttr}">`],
+    [/<meta name="twitter:title" content="[^"]*"\s*\/?>/, `<meta name="twitter:title" content="${titleAttr}">`],
+    [/<meta name="twitter:description" content="[^"]*"\s*\/?>/, `<meta name="twitter:description" content="${descAttr}">`],
+    [/<meta name="twitter:image" content="[^"]*"\s*\/?>/, `<meta name="twitter:image" content="${ogImageAttr}">`],
+  ];
+
+  let html = template;
+  for (const [pattern, replacement] of replacements) {
+    if (!pattern.test(html)) {
+      throw new Error(`Pattern ${pattern} did not match build/index.html — schema drift?`);
+    }
+    html = html.replace(pattern, replacement);
+  }
+
+  // Insert the per-route JSON-LD before </head>. The existing Person
+  // schema in index.html stays — multiple JSON-LD blocks are valid.
+  if (jsonLd) {
+    const tag = `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`;
+    html = html.replace('</head>', `${tag}</head>`);
+  }
+
+  return html;
+}
+
+function writeRoute(urlPath, html) {
+  // urlPath: '/illustrations/portraits/0ddbes65'
+  // file:    build/illustrations/portraits/0ddbes65.html
+  const slug = urlPath.replace(/^\//, '');
+  const filePath = path.join(buildDir, `${slug}.html`);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, html);
+}
+
+function imageUrlFor(item) {
+  // item.urlString is the canonical id used in image URLs
+  // (https://data.palavara.com/img/<urlString>). Falls back to the
+  // file name if urlString is missing.
+  return `https://data.palavara.com/img/${item.urlString || item.fileName}`;
+}
+
+/**
+ * Build per-route metadata for each kind of page.
+ */
+function metaFor(kind, ctx) {
+  const { section, tag, item } = ctx;
+  switch (kind) {
+    case 'info':
+      return {
+        title: 'About Varya — Palavara',
+        description:
+          'Varvara Polyakova — visual artist, illustrator and ceramicist based in Berlin. Book illustrations, graphic art, woodcuts and pottery.',
+        canonical: `${SITE_URL}/info`,
+        ogImage: DEFAULT_OG_IMAGE,
+      };
+    case 'section':
+      return {
+        title: `${capitalize(section.label)} by Varvara Polyakova`,
+        description: `${capitalize(section.label)} by Varvara Polyakova — Palavara, Berlin. Portfolio of original work across ${section.label}.`,
+        canonical: `${SITE_URL}/${section.sectionId}`,
+        ogImage: section.items?.[0] ? imageUrlFor(section.items[0]) : DEFAULT_OG_IMAGE,
+      };
+    case 'tag':
+      return {
+        title: `${capitalize(tag.label)} ${section.label} by Varvara Polyakova`,
+        description: `${capitalize(tag.label)} ${section.label} by Varvara Polyakova — Palavara, Berlin.`,
+        canonical: `${SITE_URL}/${section.sectionId}/${tag.tagId}`,
+        ogImage: tag.items?.[0] ? imageUrlFor(tag.items[0]) : DEFAULT_OG_IMAGE,
+      };
+    case 'item': {
+      const singular = SECTION_SINGULAR[section.sectionId] || capitalize(section.label);
+      return {
+        title: `${singular} by Varvara Polyakova`,
+        description: `${singular} by Varvara Polyakova — Palavara, Berlin.`,
+        canonical: `${SITE_URL}/${section.sectionId}/${item.itemId}`,
+        ogImage: imageUrlFor(item),
+      };
+    }
+    case 'tagItem': {
+      const singular = SECTION_SINGULAR[section.sectionId] || capitalize(section.label);
+      // If the same item also exists in section.items, the canonical is
+      // /<section>/<itemId>. Otherwise the tag-image URL is itself canonical.
+      const inSection = (section.items || []).some((i) => i.itemId === item.itemId);
+      const canonical = inSection
+        ? `${SITE_URL}/${section.sectionId}/${item.itemId}`
+        : `${SITE_URL}/${section.sectionId}/${tag.tagId}/${item.itemId}`;
+      return {
+        title: `${singular} by Varvara Polyakova`,
+        description: `${singular} by Varvara Polyakova — Palavara, Berlin.`,
+        canonical,
+        ogImage: imageUrlFor(item),
+      };
+    }
+    default:
+      throw new Error(`Unknown route kind: ${kind}`);
+  }
+}
+
+/**
+ * JSON-LD per route. CreativeWork for individual artworks linked to
+ * Varvara via creator @id; sections/tags are CollectionPage with
+ * Varvara as creator.
+ */
+function jsonLdFor(kind, ctx, meta) {
+  const { section, item } = ctx;
+  if (kind === 'item' || kind === 'tagItem') {
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'CreativeWork',
+      name: meta.title.replace(' by Varvara Polyakova', ''),
+      url: meta.canonical,
+      image: meta.ogImage,
+      creator: { '@id': VARYA_ID },
+      genre: section.label,
+      isPartOf: { '@type': 'CollectionPage', url: `${SITE_URL}/${section.sectionId}` },
+    };
+  }
+  if (kind === 'section' || kind === 'tag') {
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: meta.title,
+      description: meta.description,
+      url: meta.canonical,
+      creator: { '@id': VARYA_ID },
+      isPartOf: { '@type': 'WebSite', url: `${SITE_URL}/` },
+    };
+  }
+  return null; // info uses the existing Person schema in index.html
+}
+
+async function main() {
+  if (!fs.existsSync(indexPath)) {
+    console.error(`ERROR: ${indexPath} not found. Did webpack build run first?`);
+    process.exit(1);
+  }
+  const template = fs.readFileSync(indexPath, 'utf8');
+
+  let appData;
+  try {
+    appData = await fetchJson(APP_DATA_URL);
+  } catch (e) {
+    console.warn(`Prerender: AppData fetch failed (${e.message}). Skipping per-route HTML — only index.html ships.`);
+    return;
+  }
+
+  let count = 0;
+  const generate = (urlPath, kind, ctx) => {
+    const meta = metaFor(kind, ctx);
+    const ld = jsonLdFor(kind, ctx, meta);
+    const html = rewriteHtml(template, { ...meta, jsonLd: ld });
+    writeRoute(urlPath, html);
+    count++;
+  };
+
+  // /info
+  generate('/info', 'info', {});
+
+  for (const section of appData.sections || []) {
+    if (section.sectionId === 'info' || !section.sectionId) continue;
+
+    // /<sectionId>
+    generate(`/${section.sectionId}`, 'section', { section });
+
+    // /<sectionId>/<tagId>
+    for (const tag of section.tags || []) {
+      generate(`/${section.sectionId}/${tag.tagId}`, 'tag', { section, tag });
+
+      // /<sectionId>/<tagId>/<itemId>
+      for (const item of tag.items || []) {
+        generate(`/${section.sectionId}/${tag.tagId}/${item.itemId}`, 'tagItem', { section, tag, item });
+      }
+    }
+
+    // /<sectionId>/<itemId>
+    for (const item of section.items || []) {
+      generate(`/${section.sectionId}/${item.itemId}`, 'item', { section, item });
+    }
+  }
+
+  console.log(`✓ prerender: wrote ${count} per-route HTML files`);
+}
+
+main().catch((err) => {
+  console.error('prerender failed:', err);
+  process.exit(1);
+});
