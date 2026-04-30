@@ -9,6 +9,14 @@ import * as path from 'path';
  * regardless of what the live data.palavara.com/data backend returns.
  * Images are allowed through and load from the CDN as in production —
  * artwork rarely changes and the variance is acceptable.
+ *
+ * TODO: replace the live-CDN image fetches with deterministic mock
+ * images (e.g., generated SVGs at known aspect ratios) so the suite
+ * can catch real layout regressions without depending on the CDN's
+ * actual artwork bytes. Right now if Varvara replaces 7-1.jpg with a
+ * different image of similar dimensions, snapshots silently drift.
+ * Mocking would also let us test more aspect ratios without growing
+ * the fixture catalogue.
  */
 
 const fixture = JSON.parse(
@@ -77,6 +85,12 @@ const routes = [
   { path: '/illustrations', name: 'illustrations' },
   { path: '/graphics', name: 'graphics' },
   { path: '/ceramics', name: 'ceramics' },
+  // Item pages — exercise pictureFor across aspect ratios so changes
+  // to the <picture> wrapping CSS (display, sizing, srcset originalWidth
+  // fallback, …) get caught by the suite.
+  { path: '/illustrations/0ddbes65', name: 'item-landscape' },     // 7-1.jpg, 1853×1361 (~1.36)
+  { path: '/illustrations/84s4ewzf', name: 'item-portrait' },      // 7-2.jpg, 1603×1950 (~0.82)
+  { path: '/illustrations/ogjun7iq', name: 'item-small-square' },  // 7-3.jpg, 591×566 — also exercises originalWidth fallback (source < 1280)
 ];
 
 for (const route of routes) {
