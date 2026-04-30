@@ -79,6 +79,18 @@ a {
   color: inherit;
 }
 
+/* `pictureFor` wraps each <img> in a <picture> for AVIF/WebP/JPEG
+   negotiation. <picture> defaults to display: inline, which short-
+   circuits the max-width/max-height constraints on the inner <img>
+   (the inline picture sizes to the img's intrinsic dimensions, then
+   the img's "max-width: 100%" measures 100% of that — circular).
+   `display: contents` removes <picture> from the layout tree so the
+   <img> remains the effective layout target — same behavior the CSS
+   was originally written for. */
+picture {
+  display: contents;
+}
+
 a:visited, a:hover, a:focus {
   text-decoration: none;
 }
