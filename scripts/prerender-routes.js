@@ -137,10 +137,11 @@ function writeRoute(urlPath, html) {
 }
 
 function imageUrlFor(item) {
-  // item.urlString is the canonical id used in image URLs
-  // (https://data.palavara.com/img/<urlString>). Falls back to the
-  // file name if urlString is missing.
-  return `https://data.palavara.com/img/${item.urlString || item.fileName}`;
+  // The Elm app builds image URLs as `${apiUrl}${fileName}` (see
+  // src/Page.elm: `apiUrl ++ fileName`). urlString is a separate
+  // hash-like id used for routing/deep-link matching, NOT for image
+  // URLs — uploading via the admin tool puts files at /img/<fileName>.
+  return `https://data.palavara.com/img/${item.fileName}`;
 }
 
 /**
