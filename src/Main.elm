@@ -6,8 +6,8 @@ import Browser.Dom exposing (Viewport, getViewport, getViewportOf)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation exposing (Key, load)
 import Constants exposing (mobileBreakpoint)
-import Html exposing (Html, a, br, div, img, span, text)
-import Html.Attributes exposing (class, href, id, property, rel, src, style, target)
+import Html exposing (Html, a, br, div, img, source, span, text)
+import Html.Attributes exposing (alt, attribute, class, href, id, property, rel, src, style, target)
 import Html.Events.Extra exposing (onClickPreventDefault, onClickPreventDefaultAndStopPropagation)
 import Html.Events.Extra.Pointer as Pointer
 import Html.Keyed exposing (node)
@@ -734,7 +734,7 @@ infoPage data =
                 [ buildMenu menuData
                 , div [ class "info-wrapper" ]
                     [ div [ class "info-image" ]
-                        [ img (src infoContentData.urlString :: lqipAttrs infoContentData.lqip) [] ]
+                        [ pictureFor infoContentData.urlString infoContentData.lqip "" ]
                     , div [ class "info-text" ]
                         (infoText infoContentData.text)
 
@@ -825,7 +825,7 @@ buildActiveImage activeImageData =
     in
     div [ class "main-image on" ]
         [ div prevAttributes [ minus ]
-        , img (src activeImageData.urlString :: lqipAttrs activeImageData.lqip) []
+        , pictureFor activeImageData.urlString activeImageData.lqip ""
         , div nextAttributes [ plus ]
         ]
 
@@ -877,7 +877,7 @@ buildSectionPicture urlString onClickMessage isActive itemId lqip =
             )
         , onClickPreventDefault onClickMessage
         ]
-        [ img (src urlString :: lqipAttrs lqip) []
+        [ pictureFor urlString lqip ""
         ]
     )
 
@@ -1058,6 +1058,97 @@ lqipAttrs lqip =
         , style "background-repeat" "no-repeat"
         , style "background-position" "center"
         ]
+
+
+-- Mobile-focused width ladder. Mirrors the WIDTHS list in
+-- scripts/optimize-images.js — keep them in sync. Browser picks the
+-- smallest variant that's >= (slot width × DPR), so on a 390-px viewport
+-- × DPR 2 it picks 768; × DPR 3 it picks 1280; on a 1024 desktop it
+-- picks 1280. If a variant doesn't exist (the script skips widths
+-- larger than the original) the browser falls through to the next
+-- entry in the srcset.
+variantWidths : List Int
+variantWidths =
+    [ 320, 480, 640, 768, 1024, 1280 ]
+
+
+variantSizesAttr : String
+variantSizesAttr =
+    -- Mirrors src/styles.scss: gallery items are 100 % width on mobile,
+    -- ~half-width on the 1024+ desktop layout.
+    "(max-width: 1024px) 100vw, 50vw"
+
+
+splitExtension : String -> ( String, String )
+splitExtension fname =
+    case String.indexes "." fname |> List.reverse of
+        i :: _ ->
+            ( String.left i fname, String.dropLeft (i + 1) fname )
+
+        [] ->
+            ( fname, "" )
+
+
+variantSrcSet : String -> String -> String
+variantSrcSet urlString ext =
+    -- urlString: "https://data.palavara.com/img/7-1.jpg"
+    -- ext:       "avif" | "webp" | "jpg"
+    -- → "https://data.palavara.com/img/7-1-320.avif 320w, …, /7-1-1280.avif 1280w"
+    let
+        ( base, _ ) =
+            splitExtension urlString
+
+        entry w =
+            base ++ "-" ++ String.fromInt w ++ "." ++ ext ++ " " ++ String.fromInt w ++ "w"
+    in
+    variantWidths |> List.map entry |> String.join ", "
+
+
+pictureFor : String -> String -> String -> Html msg
+pictureFor urlString lqip altText =
+    -- <picture> with AVIF + WebP <source> negotiation, JPEG <img>
+    -- fallback. The inner <img> keeps the lqipAttrs background-image
+    -- trick so the LQIP shows immediately and the full image fades in
+    -- as it decodes.
+    --
+    -- Falls back to a plain <img> when lqip is empty. We populate
+    -- lqip in the same pass that uploads the responsive variants
+    -- (scripts/optimize-images.js → data.json), so an empty lqip
+    -- means the image hasn't been optimised yet — emitting srcset
+    -- entries for variants that don't exist on S3 would make the
+    -- browser hit 500s before falling back to the original.
+    if String.isEmpty lqip then
+        img
+            (src urlString
+                :: alt altText
+                :: lqipAttrs lqip
+            )
+            []
+
+    else
+        Html.node "picture"
+            []
+            [ source
+                [ attribute "type" "image/avif"
+                , attribute "srcset" (variantSrcSet urlString "avif")
+                , attribute "sizes" variantSizesAttr
+                ]
+                []
+            , source
+                [ attribute "type" "image/webp"
+                , attribute "srcset" (variantSrcSet urlString "webp")
+                , attribute "sizes" variantSizesAttr
+                ]
+                []
+            , img
+                (src urlString
+                    :: attribute "srcset" (variantSrcSet urlString "jpg")
+                    :: attribute "sizes" variantSizesAttr
+                    :: alt altText
+                    :: lqipAttrs lqip
+                )
+                []
+            ]
 
 
 relativePos : Pointer.Event -> ( Float, Float )
