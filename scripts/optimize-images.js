@@ -153,7 +153,7 @@ async function generateVariantsFor(fileName) {
   const originalPath = path.join(ORIGINALS_DIR, fileName);
   const ext = path.extname(fileName).toLowerCase().slice(1);
   if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
-    return { fileName, skipped: true, reason: `unsupported extension: ${ext}` };
+    return { fileName, skipped: true, reason: `unsupported extension: ${ext}`, widths: [] };
   }
 
   const meta = await sharp(originalPath).metadata();
@@ -173,7 +173,7 @@ async function generateVariantsFor(fileName) {
       made++;
     }
   }
-  return { fileName, made, dimensions: `${meta.width}x${meta.height}` };
+  return { fileName, made, dimensions: `${meta.width}x${meta.height}`, widths };
 }
 
 async function generateLqip(fileName) {
@@ -217,10 +217,12 @@ async function main() {
   // 2. Generate variants
   console.log(`▸ generating variants for ${usableFileNames.length} images...`);
   let totalMade = 0;
+  const widthsByFile = {};
   await pLimit(usableFileNames, CONCURRENCY, async (fn, i) => {
     try {
       const r = await generateVariantsFor(fn);
       if (r.made) totalMade += r.made;
+      widthsByFile[fn] = r.widths || [];
       if ((i + 1) % 25 === 0 || i + 1 === usableFileNames.length) {
         process.stdout.write(`  ${i + 1}/${usableFileNames.length}\r`);
       }
@@ -243,28 +245,38 @@ async function main() {
   fs.writeFileSync(LQIPS_PATH, JSON.stringify(lqips, null, 2));
   console.log(`  wrote LQIPs for ${Object.keys(lqips).length} files`);
 
-  // 4. Merge LQIPs into data.json copy. The deploy script uploads this
-  //    file to s3://palavara-front-api/data.json so the Elm app's
-  //    runtime fetch picks them up.
+  // 4. Merge LQIPs + widths into data.json copy. The deploy script
+  //    uploads this file to s3://palavara-front-api/data.json so the
+  //    Elm app's runtime fetch picks them up.
+  //
+  //    `widths` is the list of widths actually generated for this
+  //    image (the script skips widths >= original dimension). The Elm
+  //    app emits srcset entries only for these widths so the browser
+  //    can't pick a non-existent variant URL.
   let updated = 0;
-  for (const s of data.sections || []) {
-    for (const it of s.items || []) {
-      if (it.fileName && lqips[it.fileName] && it.lqip !== lqips[it.fileName]) {
-        it.lqip = lqips[it.fileName];
-        updated++;
-      }
+  const applyMeta = (it) => {
+    if (!it.fileName) return;
+    const lq = lqips[it.fileName];
+    const widths = widthsByFile[it.fileName];
+    let changed = false;
+    if (lq && it.lqip !== lq) {
+      it.lqip = lq;
+      changed = true;
     }
+    if (widths && JSON.stringify(it.widths) !== JSON.stringify(widths)) {
+      it.widths = widths;
+      changed = true;
+    }
+    if (changed) updated++;
+  };
+  for (const s of data.sections || []) {
+    for (const it of s.items || []) applyMeta(it);
     for (const t of s.tags || []) {
-      for (const it of t.items || []) {
-        if (it.fileName && lqips[it.fileName] && it.lqip !== lqips[it.fileName]) {
-          it.lqip = lqips[it.fileName];
-          updated++;
-        }
-      }
+      for (const it of t.items || []) applyMeta(it);
     }
   }
   fs.writeFileSync(DATA_OUT_PATH, JSON.stringify(data, null, 2));
-  console.log(`  merged LQIPs into ${updated} item entries`);
+  console.log(`  merged LQIPs + widths into ${updated} item entries`);
 
   console.log(`\n✓ done. Cache:`);
   console.log(`  originals: ${ORIGINALS_DIR}`);
