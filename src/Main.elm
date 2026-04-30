@@ -281,7 +281,7 @@ generatePageData modelData activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip
+                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MenuInfoData { menuSectionData = sd }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -419,7 +419,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip
+                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MobileTogglingMenuData { menuSectionData = sd, menuOpen = False }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -734,7 +734,7 @@ infoPage data =
                 [ buildMenu menuData
                 , div [ class "info-wrapper" ]
                     [ div [ class "info-image" ]
-                        [ pictureFor infoContentData.urlString infoContentData.lqip "" ]
+                        [ pictureFor infoContentData.urlString infoContentData.lqip infoContentData.widths "" ]
                     , div [ class "info-text" ]
                         (infoText infoContentData.text)
 
@@ -798,6 +798,7 @@ buildPictures contentData =
                     itemData.isActive
                     itemData.itemId
                     itemData.lqip
+                    itemData.widths
             )
          <|
             contentData.items
@@ -825,7 +826,7 @@ buildActiveImage activeImageData =
     in
     div [ class "main-image on" ]
         [ div prevAttributes [ minus ]
-        , pictureFor activeImageData.urlString activeImageData.lqip ""
+        , pictureFor activeImageData.urlString activeImageData.lqip activeImageData.widths ""
         , div nextAttributes [ plus ]
         ]
 
@@ -856,6 +857,7 @@ buildMobilePictures contentData =
                         itemData.isActive
                         itemData.itemId
                         itemData.lqip
+                        itemData.widths
                 )
              <|
                 contentData.items
@@ -863,8 +865,8 @@ buildMobilePictures contentData =
         ]
 
 
-buildSectionPicture : String -> Msg -> Bool -> ItemId -> String -> ( String, Html Msg )
-buildSectionPicture urlString onClickMessage isActive itemId lqip =
+buildSectionPicture : String -> Msg -> Bool -> ItemId -> String -> List Int -> ( String, Html Msg )
+buildSectionPicture urlString onClickMessage isActive itemId lqip widths =
     ( itemId
     , a
         [ id itemId
@@ -877,7 +879,7 @@ buildSectionPicture urlString onClickMessage isActive itemId lqip =
             )
         , onClickPreventDefault onClickMessage
         ]
-        [ pictureFor urlString lqip ""
+        [ pictureFor urlString lqip widths ""
         ]
     )
 
@@ -1060,18 +1062,6 @@ lqipAttrs lqip =
         ]
 
 
--- Mobile-focused width ladder. Mirrors the WIDTHS list in
--- scripts/optimize-images.js — keep them in sync. Browser picks the
--- smallest variant that's >= (slot width × DPR), so on a 390-px viewport
--- × DPR 2 it picks 768; × DPR 3 it picks 1280; on a 1024 desktop it
--- picks 1280. If a variant doesn't exist (the script skips widths
--- larger than the original) the browser falls through to the next
--- entry in the srcset.
-variantWidths : List Int
-variantWidths =
-    [ 320, 480, 640, 768, 1024, 1280 ]
-
-
 variantSizesAttr : String
 variantSizesAttr =
     -- Mirrors src/styles.scss: gallery items are 100 % width on mobile,
@@ -1089,11 +1079,14 @@ splitExtension fname =
             ( fname, "" )
 
 
-variantSrcSet : String -> String -> String
-variantSrcSet urlString ext =
+variantSrcSet : String -> String -> List Int -> String
+variantSrcSet urlString ext widths =
     -- urlString: "https://data.palavara.com/img/7-1.jpg"
     -- ext:       "avif" | "webp" | "jpg"
-    -- → "https://data.palavara.com/img/7-1-320.avif 320w, …, /7-1-1280.avif 1280w"
+    -- widths:    only the widths actually generated for this image
+    --            (skipped if larger than the source). Stored per-item
+    --            in data.json so the browser never gets a 500 from
+    --            srcset selecting a non-existent variant.
     let
         ( base, _ ) =
             splitExtension urlString
@@ -1101,26 +1094,27 @@ variantSrcSet urlString ext =
         entry w =
             base ++ "-" ++ String.fromInt w ++ "." ++ ext ++ " " ++ String.fromInt w ++ "w"
     in
-    variantWidths |> List.map entry |> String.join ", "
+    widths |> List.map entry |> String.join ", "
 
 
-pictureFor : String -> String -> String -> Html msg
-pictureFor urlString lqip altText =
+pictureFor : String -> String -> List Int -> String -> Html msg
+pictureFor urlString lqip widths altText =
     -- <picture> with AVIF + WebP <source> negotiation, JPEG <img>
     -- fallback. The inner <img> keeps the lqipAttrs background-image
     -- trick so the LQIP shows immediately and the full image fades in
     -- as it decodes.
     --
-    -- Falls back to a plain <img> when lqip is empty. We populate
-    -- lqip in the same pass that uploads the responsive variants
-    -- (scripts/optimize-images.js → data.json), so an empty lqip
-    -- means the image hasn't been optimised yet — emitting srcset
-    -- entries for variants that don't exist on S3 would make the
-    -- browser hit 500s before falling back to the original.
-    if String.isEmpty lqip then
+    -- Falls back to a plain <img> when widths is empty (no variants
+    -- generated). The optimize pipeline records which widths it
+    -- actually produced; an item with widths == [] hasn't been
+    -- processed yet, so we serve the original to avoid 500s on
+    -- non-existent variant URLs.
+    if List.isEmpty widths then
         img
             (src urlString
                 :: alt altText
+                :: attribute "loading" "lazy"
+                :: attribute "decoding" "async"
                 :: lqipAttrs lqip
             )
             []
@@ -1130,21 +1124,23 @@ pictureFor urlString lqip altText =
             []
             [ source
                 [ attribute "type" "image/avif"
-                , attribute "srcset" (variantSrcSet urlString "avif")
+                , attribute "srcset" (variantSrcSet urlString "avif" widths)
                 , attribute "sizes" variantSizesAttr
                 ]
                 []
             , source
                 [ attribute "type" "image/webp"
-                , attribute "srcset" (variantSrcSet urlString "webp")
+                , attribute "srcset" (variantSrcSet urlString "webp" widths)
                 , attribute "sizes" variantSizesAttr
                 ]
                 []
             , img
                 (src urlString
-                    :: attribute "srcset" (variantSrcSet urlString "jpg")
+                    :: attribute "srcset" (variantSrcSet urlString "jpg" widths)
                     :: attribute "sizes" variantSizesAttr
                     :: alt altText
+                    :: attribute "loading" "lazy"
+                    :: attribute "decoding" "async"
                     :: lqipAttrs lqip
                 )
                 []
