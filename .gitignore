@@ -25,3 +25,6 @@ mock-data/
 # e2e/...-snapshots/ ARE checked in, just not these run outputs).
 playwright-report/
 test-results/
+
+# Cache for scripts/optimize-images.js — local-only artifacts.
+.optimize-cache/

@@ -23,6 +23,8 @@
     "deploy": "npm run build && scripts/deploy.sh",
     "deploy-production": "npm run build && scripts/deploy-prod.sh",
     "generate-lqip": "node scripts/generate-lqip.js",
+    "optimize-images": "node scripts/optimize-images.js",
+    "optimize-images:deploy": "scripts/optimize-images-deploy.sh",
     "test:visual": "docker run --rm --user $(id -u):$(id -g) -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.58.0-noble bash -c 'HOME=/tmp NODE_OPTIONS=--openssl-legacy-provider npx playwright test'",
     "test:visual:update": "docker run --rm --user $(id -u):$(id -g) -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.58.0-noble bash -c 'HOME=/tmp NODE_OPTIONS=--openssl-legacy-provider npx playwright test --update-snapshots=all'",
     "test:visual:report": "playwright show-report"
