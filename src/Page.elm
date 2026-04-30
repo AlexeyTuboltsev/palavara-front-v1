@@ -93,6 +93,7 @@ type alias ItemContentData =
     , isActive : Bool
     , lqip : String
     , widths : List Int
+    , originalWidth : Maybe Int
     }
 
 
@@ -103,6 +104,7 @@ type alias ActiveItemContentData =
     , nextRoute : Maybe Msg
     , lqip : String
     , widths : List Int
+    , originalWidth : Maybe Int
     }
 
 
@@ -111,6 +113,7 @@ type alias InfoContentData =
     , text : String
     , lqip : String
     , widths : List Int
+    , originalWidth : Maybe Int
     }
 
 
@@ -307,7 +310,7 @@ generateGalleryContentData apiUrl nextRoute items =
             GoToRoute <| nextRoute itemId
     in
     List.map
-        (\{ itemId, fileName, lqip, widths } ->
+        (\{ itemId, fileName, lqip, widths, originalWidth } ->
             ItemContentData
                 itemId
                 (apiUrl ++ fileName)
@@ -315,6 +318,7 @@ generateGalleryContentData apiUrl nextRoute items =
                 False
                 lqip
                 widths
+                originalWidth
         )
         items
         |> GalleryContentDataType
@@ -328,7 +332,7 @@ generateGalleryItemContentData apiUrl nextRoute activeItem items =
 
         itemDataList =
             List.map
-                (\{ itemId, fileName, lqip, widths } ->
+                (\{ itemId, fileName, lqip, widths, originalWidth } ->
                     ItemContentData
                         itemId
                         (apiUrl ++ fileName)
@@ -336,6 +340,7 @@ generateGalleryItemContentData apiUrl nextRoute activeItem items =
                         (itemId == activeItem.itemId)
                         lqip
                         widths
+                        originalWidth
                 )
                 items
 
@@ -350,7 +355,7 @@ generateGalleryItemContentData apiUrl nextRoute activeItem items =
                 |> Maybe.andThen (\{ itemId } -> Just <| onClickMessage itemId)
 
         activeItemData =
-            ActiveItemContentData activeItem.itemId (apiUrl ++ activeItem.fileName) prevOnClick nextOnClick activeItem.lqip activeItem.widths
+            ActiveItemContentData activeItem.itemId (apiUrl ++ activeItem.fileName) prevOnClick nextOnClick activeItem.lqip activeItem.widths activeItem.originalWidth
     in
     GalleryImageContentDataType itemDataList activeItemData
 
@@ -371,7 +376,7 @@ generateMobileGalleryItemContentData apiUrl sliderHeight nextRoute activeItemId 
 
         itemDataList =
             List.map
-                (\{ itemId, fileName, lqip, widths } ->
+                (\{ itemId, fileName, lqip, widths, originalWidth } ->
                     ItemContentData
                         itemId
                         (apiUrl ++ fileName)
@@ -379,15 +384,16 @@ generateMobileGalleryItemContentData apiUrl sliderHeight nextRoute activeItemId 
                         (itemId == activeItemId)
                         lqip
                         widths
+                        originalWidth
                 )
                 items
     in
     MobileGalleryContentDataType itemDataList activeItemIndex sliderHeight topOffset Nothing False
 
 
-generateInfoContentData : String -> String -> String -> String -> List Int -> InfoContentData
-generateInfoContentData text apiUrl imageId lqip widths =
-    InfoContentData (apiUrl ++ imageId) text lqip widths
+generateInfoContentData : String -> String -> String -> String -> List Int -> Maybe Int -> InfoContentData
+generateInfoContentData text apiUrl imageId lqip widths originalWidth =
+    InfoContentData (apiUrl ++ imageId) text lqip widths originalWidth
 
 
 -- UTILS --

@@ -281,7 +281,7 @@ generatePageData modelData activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths
+                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths id.originalWidth
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MenuInfoData { menuSectionData = sd }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -419,7 +419,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths
+                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths id.originalWidth
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MobileTogglingMenuData { menuSectionData = sd, menuOpen = False }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -734,7 +734,7 @@ infoPage data =
                 [ buildMenu menuData
                 , div [ class "info-wrapper" ]
                     [ div [ class "info-image" ]
-                        [ pictureFor infoContentData.urlString infoContentData.lqip infoContentData.widths "" ]
+                        [ pictureFor infoContentData.urlString infoContentData.lqip infoContentData.widths infoContentData.originalWidth "" ]
                     , div [ class "info-text" ]
                         (infoText infoContentData.text)
 
@@ -799,6 +799,7 @@ buildPictures contentData =
                     itemData.itemId
                     itemData.lqip
                     itemData.widths
+                    itemData.originalWidth
             )
          <|
             contentData.items
@@ -826,7 +827,7 @@ buildActiveImage activeImageData =
     in
     div [ class "main-image on" ]
         [ div prevAttributes [ minus ]
-        , pictureFor activeImageData.urlString activeImageData.lqip activeImageData.widths ""
+        , pictureFor activeImageData.urlString activeImageData.lqip activeImageData.widths activeImageData.originalWidth ""
         , div nextAttributes [ plus ]
         ]
 
@@ -858,6 +859,7 @@ buildMobilePictures contentData =
                         itemData.itemId
                         itemData.lqip
                         itemData.widths
+                        itemData.originalWidth
                 )
              <|
                 contentData.items
@@ -865,8 +867,8 @@ buildMobilePictures contentData =
         ]
 
 
-buildSectionPicture : String -> Msg -> Bool -> ItemId -> String -> List Int -> ( String, Html Msg )
-buildSectionPicture urlString onClickMessage isActive itemId lqip widths =
+buildSectionPicture : String -> Msg -> Bool -> ItemId -> String -> List Int -> Maybe Int -> ( String, Html Msg )
+buildSectionPicture urlString onClickMessage isActive itemId lqip widths originalWidth =
     ( itemId
     , a
         [ id itemId
@@ -879,7 +881,7 @@ buildSectionPicture urlString onClickMessage isActive itemId lqip widths =
             )
         , onClickPreventDefault onClickMessage
         ]
-        [ pictureFor urlString lqip widths ""
+        [ pictureFor urlString lqip widths originalWidth ""
         ]
     )
 
@@ -1079,26 +1081,45 @@ splitExtension fname =
             ( fname, "" )
 
 
-variantSrcSet : String -> String -> List Int -> String
-variantSrcSet urlString ext widths =
+variantSrcSet : String -> String -> List Int -> Maybe Int -> String
+variantSrcSet urlString ext widths originalWidth =
     -- urlString: "https://data.palavara.com/img/7-1.jpg"
     -- ext:       "avif" | "webp" | "jpg"
     -- widths:    only the widths actually generated for this image
     --            (skipped if larger than the source). Stored per-item
     --            in data.json so the browser never gets a 500 from
     --            srcset selecting a non-existent variant.
+    -- originalWidth: width of the source image. Appended as the
+    --            largest entry pointing at urlString itself, so the
+    --            browser picks the unscaled original instead of CSS-
+    --            upscaling a smaller variant when the slot is bigger
+    --            than any generated variant. Only used for the JPEG
+    --            srcset (the urlString points at the JPEG/PNG/WebP
+    --            original) — AVIF/WebP <source> srcsets stay variant-
+    --            only since the original isn't an AVIF/WebP.
     let
         ( base, _ ) =
             splitExtension urlString
 
         entry w =
             base ++ "-" ++ String.fromInt w ++ "." ++ ext ++ " " ++ String.fromInt w ++ "w"
+
+        variantEntries =
+            widths |> List.map entry
+
+        entries =
+            case ( ext, originalWidth ) of
+                ( "jpg", Just w ) ->
+                    variantEntries ++ [ urlString ++ " " ++ String.fromInt w ++ "w" ]
+
+                _ ->
+                    variantEntries
     in
-    widths |> List.map entry |> String.join ", "
+    String.join ", " entries
 
 
-pictureFor : String -> String -> List Int -> String -> Html msg
-pictureFor urlString lqip widths altText =
+pictureFor : String -> String -> List Int -> Maybe Int -> String -> Html msg
+pictureFor urlString lqip widths originalWidth altText =
     -- <picture> with AVIF + WebP <source> negotiation, JPEG <img>
     -- fallback. The inner <img> keeps the lqipAttrs background-image
     -- trick so the LQIP shows immediately and the full image fades in
@@ -1124,19 +1145,19 @@ pictureFor urlString lqip widths altText =
             []
             [ source
                 [ attribute "type" "image/avif"
-                , attribute "srcset" (variantSrcSet urlString "avif" widths)
+                , attribute "srcset" (variantSrcSet urlString "avif" widths originalWidth)
                 , attribute "sizes" variantSizesAttr
                 ]
                 []
             , source
                 [ attribute "type" "image/webp"
-                , attribute "srcset" (variantSrcSet urlString "webp" widths)
+                , attribute "srcset" (variantSrcSet urlString "webp" widths originalWidth)
                 , attribute "sizes" variantSizesAttr
                 ]
                 []
             , img
                 (src urlString
-                    :: attribute "srcset" (variantSrcSet urlString "jpg" widths)
+                    :: attribute "srcset" (variantSrcSet urlString "jpg" widths originalWidth)
                     :: attribute "sizes" variantSizesAttr
                     :: alt altText
                     :: attribute "loading" "lazy"

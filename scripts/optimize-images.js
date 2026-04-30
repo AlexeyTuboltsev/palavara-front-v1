@@ -173,7 +173,7 @@ async function generateVariantsFor(fileName) {
       made++;
     }
   }
-  return { fileName, made, dimensions: `${meta.width}x${meta.height}`, widths };
+  return { fileName, made, dimensions: `${meta.width}x${meta.height}`, widths, originalWidth: meta.width || null };
 }
 
 async function generateLqip(fileName) {
@@ -218,11 +218,13 @@ async function main() {
   console.log(`▸ generating variants for ${usableFileNames.length} images...`);
   let totalMade = 0;
   const widthsByFile = {};
+  const originalWidthByFile = {};
   await pLimit(usableFileNames, CONCURRENCY, async (fn, i) => {
     try {
       const r = await generateVariantsFor(fn);
       if (r.made) totalMade += r.made;
       widthsByFile[fn] = r.widths || [];
+      if (r.originalWidth) originalWidthByFile[fn] = r.originalWidth;
       if ((i + 1) % 25 === 0 || i + 1 === usableFileNames.length) {
         process.stdout.write(`  ${i + 1}/${usableFileNames.length}\r`);
       }
@@ -258,6 +260,7 @@ async function main() {
     if (!it.fileName) return;
     const lq = lqips[it.fileName];
     const widths = widthsByFile[it.fileName];
+    const ow = originalWidthByFile[it.fileName];
     let changed = false;
     if (lq && it.lqip !== lq) {
       it.lqip = lq;
@@ -265,6 +268,10 @@ async function main() {
     }
     if (widths && JSON.stringify(it.widths) !== JSON.stringify(widths)) {
       it.widths = widths;
+      changed = true;
+    }
+    if (ow && it.originalWidth !== ow) {
+      it.originalWidth = ow;
       changed = true;
     }
     if (changed) updated++;
