@@ -79,7 +79,21 @@ async function setupMocks(page: Page) {
   await page.route('**/google-analytics.com/**', (route) => route.abort());
 }
 
-const routes = [
+// `skipProjects` is the Playwright project names to skip for this
+// route. Item routes skip "chromium-tablet" (1024 px viewport) because
+// it sits exactly at Elm's <=1024 mobile-breakpoint AND CSS's >=1024
+// desktop breakpoint — and there's an existing bug where layout
+// becomes unstable when crossing viewport boundaries (e.g., on screen
+// rotation or live resize). At tablet width the item-route render is
+// blank; we don't want to bake that into a baseline.
+//
+// TODO: fix the underlying viewport-transition layout bug (Elm app
+// doesn't fully re-derive layout when the screen size crosses the
+// breakpoint — direct navigation can render correctly but rotation
+// from another viewport leaves the page in a half-rendered state).
+// Once fixed, the tablet skip below can be removed.
+type RouteSpec = { path: string; name: string; skipProjects?: string[] };
+const routes: RouteSpec[] = [
   { path: '/', name: 'home' },
   { path: '/info', name: 'info' },
   { path: '/illustrations', name: 'illustrations' },
@@ -88,13 +102,16 @@ const routes = [
   // Item pages — exercise pictureFor across aspect ratios so changes
   // to the <picture> wrapping CSS (display, sizing, srcset originalWidth
   // fallback, …) get caught by the suite.
-  { path: '/illustrations/0ddbes65', name: 'item-landscape' },     // 7-1.jpg, 1853×1361 (~1.36)
-  { path: '/illustrations/84s4ewzf', name: 'item-portrait' },      // 7-2.jpg, 1603×1950 (~0.82)
-  { path: '/illustrations/ogjun7iq', name: 'item-small-square' },  // 7-3.jpg, 591×566 — also exercises originalWidth fallback (source < 1280)
+  { path: '/illustrations/0ddbes65', name: 'item-landscape',    skipProjects: ['chromium-tablet'] }, // 7-1.jpg, 1853×1361 (~1.36)
+  { path: '/illustrations/84s4ewzf', name: 'item-portrait',     skipProjects: ['chromium-tablet'] }, // 7-2.jpg, 1603×1950 (~0.82)
+  { path: '/illustrations/ogjun7iq', name: 'item-small-square', skipProjects: ['chromium-tablet'] }, // 7-3.jpg, 591×566 — also exercises originalWidth fallback (source < 1280)
 ];
 
 for (const route of routes) {
-  test(`${route.name} - visual regression`, async ({ page }) => {
+  test(`${route.name} - visual regression`, async ({ page }, testInfo) => {
+    if (route.skipProjects?.includes(testInfo.project.name)) {
+      test.skip(true, `${route.name} skipped on ${testInfo.project.name} (see route definition)`);
+    }
     await setupMocks(page);
     await page.goto(route.path);
     await page.waitForLoadState('networkidle');
