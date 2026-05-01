@@ -27,7 +27,15 @@
 
     <link rel="canonical" href="https://palavara.com/" />
 
+    <!-- Two preconnects to data.palavara.com — one in CORS bucket, one
+         in no-CORS bucket. The Elm runtime fetches /data via Http.get
+         (fetch() → CORS) and the gallery <img>/<picture> tags load
+         images in no-CORS mode. A single preconnect only warms one
+         bucket; PSI was flagging the existing crossorigin one as
+         "Unused preconnect" because the LCP image fetch was on the
+         other bucket. Listing both opens both connections in parallel. -->
     <link rel="preconnect" href="https://data.palavara.com" crossorigin>
+    <link rel="preconnect" href="https://data.palavara.com">
 
     <meta property="og:type" content="website">
     <meta property="og:title" content="Varvara Polyakova — Illustrations, Graphics & Ceramics">
