@@ -261,7 +261,21 @@ async function main() {
     console.error(`ERROR: ${indexPath} not found. Did webpack build run first?`);
     process.exit(1);
   }
-  const template = fs.readFileSync(indexPath, 'utf8');
+  let template = fs.readFileSync(indexPath, 'utf8');
+
+  // Add `defer` to the main.js <script>. html-webpack-plugin v4-beta
+  // doesn't honour `scriptLoading: 'defer'`, so the bundle ships as
+  // a render-blocking <script src="/main.<hash>.js"></script> by
+  // default. Defer keeps the parser unblocked through HTML; Elm's
+  // first paint is data-driven anyway (waits on /data fetch), so
+  // there's no TTI cost — only an FCP win. Lighthouse measured
+  // ~1.2 s of render-blocking on the pre-defer build.
+  const scriptRe = /<script src="\/main\.[a-z0-9]+\.js"><\/script>/;
+  if (!scriptRe.test(template)) {
+    throw new Error('Could not find main.js <script> in build/index.html — schema drift?');
+  }
+  template = template.replace(scriptRe, (m) => m.replace('<script ', '<script defer '));
+  fs.writeFileSync(indexPath, template);
 
   let appData;
   try {
