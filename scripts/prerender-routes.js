@@ -234,6 +234,28 @@ function jsonLdFor(kind, ctx, meta) {
   return null; // info uses the existing Person schema in index.html
 }
 
+function writeSitemap(canonicalUrls) {
+  // canonicalUrls is an array of { path, priority, changefreq } in the
+  // order we want them to appear in the sitemap. We deliberately omit
+  // tag-item routes (/<section>/<tagId>/<itemId>) — those carry a
+  // canonical tag pointing back at the section-image URL, so listing
+  // them in the sitemap would just duplicate signal and hand Google
+  // "Page with redirect" entries it has to dedupe.
+  const lines = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+  ];
+  for (const u of canonicalUrls) {
+    lines.push(
+      `  <url><loc>${SITE_URL}${u.path}</loc><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`,
+    );
+  }
+  lines.push('</urlset>', '');
+  const out = path.join(buildDir, 'sitemap.xml');
+  fs.writeFileSync(out, lines.join('\n'));
+  console.log(`✓ sitemap: wrote ${canonicalUrls.length} URLs to ${out}`);
+}
+
 async function main() {
   if (!fs.existsSync(indexPath)) {
     console.error(`ERROR: ${indexPath} not found. Did webpack build run first?`);
@@ -250,6 +272,7 @@ async function main() {
   }
 
   let count = 0;
+  const sitemapUrls = [];
   const generate = (urlPath, kind, ctx) => {
     const meta = metaFor(kind, ctx);
     const ld = jsonLdFor(kind, ctx, meta);
@@ -258,32 +281,54 @@ async function main() {
     count++;
   };
 
+  // / (home)
+  sitemapUrls.push({ path: '/', priority: '1.0', changefreq: 'monthly' });
+
   // /info
   generate('/info', 'info', {});
+  sitemapUrls.push({ path: '/info', priority: '0.6', changefreq: 'yearly' });
 
   for (const section of appData.sections || []) {
     if (section.sectionId === 'info' || !section.sectionId) continue;
 
     // /<sectionId>
     generate(`/${section.sectionId}`, 'section', { section });
+    sitemapUrls.push({
+      path: `/${section.sectionId}`,
+      priority: '0.9',
+      changefreq: 'monthly',
+    });
 
     // /<sectionId>/<tagId>
     for (const tag of section.tags || []) {
       generate(`/${section.sectionId}/${tag.tagId}`, 'tag', { section, tag });
+      sitemapUrls.push({
+        path: `/${section.sectionId}/${tag.tagId}`,
+        priority: '0.7',
+        changefreq: 'monthly',
+      });
 
-      // /<sectionId>/<tagId>/<itemId>
+      // /<sectionId>/<tagId>/<itemId> — prerendered for direct-link
+      // freshness and crawler reachability, but NOT in sitemap (their
+      // canonical points at /<section>/<itemId> below).
       for (const item of tag.items || []) {
         generate(`/${section.sectionId}/${tag.tagId}/${item.itemId}`, 'tagItem', { section, tag, item });
       }
     }
 
-    // /<sectionId>/<itemId>
+    // /<sectionId>/<itemId> — canonical per-artwork URL
     for (const item of section.items || []) {
       generate(`/${section.sectionId}/${item.itemId}`, 'item', { section, item });
+      sitemapUrls.push({
+        path: `/${section.sectionId}/${item.itemId}`,
+        priority: '0.5',
+        changefreq: 'monthly',
+      });
     }
   }
 
   console.log(`✓ prerender: wrote ${count} per-route HTML files`);
+  writeSitemap(sitemapUrls);
 }
 
 main().catch((err) => {
