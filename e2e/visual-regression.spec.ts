@@ -48,15 +48,34 @@ async function setupMocks(page: Page) {
     webp: 'image/webp',
     jpg: 'image/jpeg',
   };
+  // The home page's hero image is a CSS background-image hardcoded to
+  // /img/0.jpg in styles.scss (the "trees" photo in production). The
+  // fixture appdata can't redirect that — it's compiled into CSS — so
+  // the route handler maps it to the home-hero mock at the original
+  // 1300×976 dimensions.
+  const hardcodedAliases: Record<string, string> = {
+    '0.jpg': 'test-home-hero',
+    '0.jpeg': 'test-home-hero',
+    '0.webp': 'test-home-hero',
+    '0.avif': 'test-home-hero',
+  };
+
   await page.route('**/data.palavara.com/**/img/**', async (route) => {
     const url = route.request().url();
-    // Match any /img/<base>(-<width>)?.<ext> where <base> is one of
-    // our test fixtures. The route handler doesn't care which width
-    // the browser asked for — it serves the source mock — because the
-    // suite tests layout, not bandwidth efficiency.
-    const m = url.match(/\/img\/(test-[a-z-]+?)(?:-\d+)?\.(avif|webp|jpg)(?:\?.*)?$/);
+    // Strip variant suffix and query string, then match either:
+    //   - one of our /img/test-<name>(-<width>)?.<ext> mocks, or
+    //   - a hardcoded alias like /img/0.jpg → home-hero.
+    const m = url.match(/\/img\/([^/?#]+?)(?:-\d+)?\.(avif|webp|jpg)(?:\?.*)?$/);
     if (!m) return route.fulfill({ status: 404 });
-    const [, base, ext] = m;
+    const [, basenameRaw, ext] = m;
+    const aliasKey = `${basenameRaw}.${ext}`;
+    let base: string | undefined;
+    if (basenameRaw.startsWith('test-')) {
+      base = basenameRaw;
+    } else if (hardcodedAliases[aliasKey]) {
+      base = hardcodedAliases[aliasKey];
+    }
+    if (!base) return route.fulfill({ status: 404 });
     const file = path.join(mockDir, `${base}.${ext}`);
     try {
       const body = fs.readFileSync(file);

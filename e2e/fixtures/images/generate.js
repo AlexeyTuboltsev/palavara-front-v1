@@ -67,6 +67,12 @@ const fixtures = [
   { name: 'large-landscape',   width: 2400, height: 1600 },
   { name: 'large-portrait',    width: 1600, height: 2400 },
   { name: 'square-large',      width: 1600, height: 1600 },
+  // Mocks sized to match specific production originals so the home
+  // hero (CSS background, 0.jpg) and the about-me portrait
+  // (IMG_7526.JPG, 3360×5040) appear at realistic dimensions in the
+  // visual-regression suite.
+  { name: 'home-hero',         width: 1300, height:  976 }, // matches /img/0.jpg
+  { name: 'about',             width: 3360, height: 5040 }, // matches /img/IMG_7526.JPG
 ];
 
 function svgFor({ name, width, height }, color) {
