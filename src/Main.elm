@@ -131,10 +131,35 @@ update message model =
                     ( ReadyModel readyModelData, Task.perform SetViewport getViewport )
 
                 SetViewport viewport ->
-                    ( ReadyModel { readyModelData | viewport = viewport }, Cmd.none )
+                    -- Re-derive the page when the viewport crosses the
+                    -- mobile-breakpoint boundary. Both the route parser
+                    -- and generatePageData / generateMobilePageData
+                    -- branch on `viewport.width < mobileBreakpoint`, so
+                    -- without this re-derive the model's viewport flips
+                    -- mode but the rendered page stays in the previous
+                    -- mode — content and CSS disagree (e.g., desktop
+                    -- grid markup with mobile CSS, or vice versa). Most
+                    -- visible after orientation change on tablets, and
+                    -- that's the bug the visual-regression item-route
+                    -- tablet snapshots were exposing.
+                    let
+                        oldIsMobile =
+                            readyModelData.viewport.viewport.width < mobileBreakpoint
+
+                        newIsMobile =
+                            viewport.viewport.width < mobileBreakpoint
+
+                        newModelData =
+                            { readyModelData | viewport = viewport }
+                    in
+                    if oldIsMobile == newIsMobile then
+                        ( ReadyModel newModelData, Cmd.none )
+
+                    else
+                        update (GoToRoute newModelData.route) (ReadyModel newModelData)
 
                 GoToRoute route ->
-                    case readyModelData.viewport.viewport.width <= mobileBreakpoint of
+                    case readyModelData.viewport.viewport.width < mobileBreakpoint of
                         True ->
                             generateMobilePageData readyModelData readyModelData.viewport.scene.height route
 
