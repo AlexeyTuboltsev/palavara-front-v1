@@ -276,11 +276,37 @@ async function main() {
     }
     if (changed) updated++;
   };
+  // Info sections store the image under `imageId` (not `fileName`),
+  // so applyMeta — which keys off `fileName` — skips them. Walk those
+  // separately and merge metadata using `imageId` as the lookup key.
+  // Without this, the about page falls through `pictureFor`'s empty-
+  // widths branch and serves the unoptimized original (6 MB+).
+  const applyInfoMeta = (s) => {
+    if (!s.imageId) return;
+    const lq = lqips[s.imageId];
+    const widths = widthsByFile[s.imageId];
+    const ow = originalWidthByFile[s.imageId];
+    let changed = false;
+    if (lq && s.lqip !== lq) {
+      s.lqip = lq;
+      changed = true;
+    }
+    if (widths && JSON.stringify(s.widths) !== JSON.stringify(widths)) {
+      s.widths = widths;
+      changed = true;
+    }
+    if (ow && s.originalWidth !== ow) {
+      s.originalWidth = ow;
+      changed = true;
+    }
+    if (changed) updated++;
+  };
   for (const s of data.sections || []) {
     for (const it of s.items || []) applyMeta(it);
     for (const t of s.tags || []) {
       for (const it of t.items || []) applyMeta(it);
     }
+    if (s.type === 'info') applyInfoMeta(s);
   }
   fs.writeFileSync(DATA_OUT_PATH, JSON.stringify(data, null, 2));
   console.log(`  merged LQIPs + widths into ${updated} item entries`);
