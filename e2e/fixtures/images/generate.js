@@ -1,0 +1,131 @@
+#!/usr/bin/env node
+/**
+ * Generate deterministic mock images for visual regression.
+ *
+ * Twelve mocks at distinct dimensions / aspect ratios spanning the
+ * corner cases of the production optimize pipeline:
+ *
+ *   - tiny-square      240×240    < 320 → no variants generated
+ *   - tiny-portrait    280×420    < 320 → no variants generated
+ *   - small-landscape  640×420    partial variants (320, 480) only
+ *   - small-portrait   420×640    partial variants
+ *   - square-medium    800×800    variants up to 768
+ *   - medium-landscape 1200×800   variants up to 1024
+ *   - medium-portrait  800×1200   variants up to 768
+ *   - wide-panoramic   1920×800   all six widths, extreme aspect
+ *   - tall-narrow      800×1920   all six widths, extreme aspect
+ *   - large-landscape  2400×1600  all six widths
+ *   - large-portrait   1600×2400  all six widths
+ *   - square-large     1600×1600  all six widths
+ *
+ * Each is colour-coded (distinct hue per mock) and labelled with the
+ * dimensions, so screenshots are easy to eyeball: which slot got which
+ * mock, and at what size.
+ *
+ * Each mock is produced in AVIF + WebP + JPEG so <picture> source
+ * negotiation lands on a real decodable file in every browser. The
+ * route handler in visual-regression.spec.ts serves these for any
+ * /img/<base>(-<width>)?.<ext> request — variant URLs all map back
+ * to the same source mock since the suite tests layout, not bandwidth.
+ *
+ * Run on demand: `node e2e/fixtures/images/generate.js`. Outputs are
+ * checked in alongside this script.
+ */
+
+const sharp = require('sharp');
+const path = require('path');
+
+const OUT_DIR = __dirname;
+
+// 12-step palette spanning the colour wheel — adjacent mocks read as
+// clearly different hues in screenshots.
+const palette = [
+  '#dc2626', // red
+  '#ea580c', // orange
+  '#ca8a04', // amber
+  '#65a30d', // lime
+  '#16a34a', // green
+  '#0d9488', // teal
+  '#0284c7', // sky
+  '#2563eb', // blue
+  '#7c3aed', // violet
+  '#a21caf', // fuchsia
+  '#be185d', // pink
+  '#525252', // grey (last; falls back when needed)
+];
+
+const fixtures = [
+  { name: 'tiny-square',       width:  240, height:  240 },
+  { name: 'tiny-portrait',     width:  280, height:  420 },
+  { name: 'small-landscape',   width:  640, height:  420 },
+  { name: 'small-portrait',    width:  420, height:  640 },
+  { name: 'square-medium',     width:  800, height:  800 },
+  { name: 'medium-landscape',  width: 1200, height:  800 },
+  { name: 'medium-portrait',   width:  800, height: 1200 },
+  { name: 'wide-panoramic',    width: 1920, height:  800 },
+  { name: 'tall-narrow',       width:  800, height: 1920 },
+  { name: 'large-landscape',   width: 2400, height: 1600 },
+  { name: 'large-portrait',    width: 1600, height: 2400 },
+  { name: 'square-large',      width: 1600, height: 1600 },
+  // Mocks sized to match specific production originals so the home
+  // hero (CSS background, 0.jpg) and the about-me portrait
+  // (IMG_7526.JPG, 3360×5040) appear at realistic dimensions in the
+  // visual-regression suite.
+  { name: 'home-hero',         width: 1300, height:  976 }, // matches /img/0.jpg
+  { name: 'about',             width: 3360, height: 5040 }, // matches /img/IMG_7526.JPG
+];
+
+function svgFor({ name, width, height }, color) {
+  const minDim = Math.min(width, height);
+  // Scale label sizes so they're readable on the smallest mocks
+  // without dominating the largest ones.
+  const labelSize = Math.max(20, Math.round(minDim / 8));
+  const dimSize = Math.max(14, Math.round(minDim / 14));
+  const stroke = Math.max(2, Math.round(minDim / 200));
+  // Wrap long names onto two lines (e.g., "medium-landscape"). Label
+  // block is vertically centred; dim line sits below the block with a
+  // gap proportional to label size.
+  const labelLines = name.toUpperCase().split('-');
+  const lineSpacing = labelSize * 1.05;
+  const labelBlockHeight = lineSpacing * labelLines.length;
+  // Total vertical block: labels + gap + dim line.
+  const gap = labelSize * 0.6;
+  const totalBlock = labelBlockHeight + gap + dimSize;
+  // Centre the whole block in the image.
+  const blockTop = height / 2 - totalBlock / 2;
+  const dimY = blockTop + labelBlockHeight + gap + dimSize / 2;
+  const labelTspans = labelLines
+    .map((line, i) => {
+      // First tspan starts at the label block top + half line height
+      // (so the text baseline lands centred in its line).
+      if (i === 0) {
+        return `<tspan x="50%" y="${blockTop + lineSpacing / 2}">${line}</tspan>`;
+      }
+      return `<tspan x="50%" dy="${lineSpacing}">${line}</tspan>`;
+    })
+    .join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+  <rect width="100%" height="100%" fill="${color}"/>
+  <rect x="2%" y="2%" width="96%" height="96%" fill="none" stroke="#ffffff" stroke-width="${stroke}"/>
+  <text font-family="sans-serif" font-size="${labelSize}" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${labelTspans}</text>
+  <text x="50%" y="${dimY}" font-family="sans-serif" font-size="${dimSize}" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${width}×${height}</text>
+</svg>`;
+}
+
+async function main() {
+  for (let i = 0; i < fixtures.length; i++) {
+    const f = fixtures[i];
+    const color = palette[i % palette.length];
+    const svgBuf = Buffer.from(svgFor(f, color));
+    const base = path.join(OUT_DIR, `test-${f.name}`);
+    await sharp(svgBuf).avif({ quality: 70 }).toFile(`${base}.avif`);
+    await sharp(svgBuf).webp({ quality: 80 }).toFile(`${base}.webp`);
+    await sharp(svgBuf).jpeg({ quality: 85, progressive: true }).toFile(`${base}.jpg`);
+    console.log(`✓ test-${f.name}.{avif,webp,jpg} (${f.width}×${f.height}, ${color})`);
+  }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

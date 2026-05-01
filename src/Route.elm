@@ -25,7 +25,7 @@ parseToRoute url data viewport =
 
 routeParser : AppData -> Viewport -> Parser (Route -> a) a
 routeParser data viewport =
-    if viewport.viewport.width <= mobileBreakpoint then
+    if viewport.viewport.width < mobileBreakpoint then
         oneOf
             [ UrlParser.map Root top
             , UrlParser.map InfoRoute (s "info")
