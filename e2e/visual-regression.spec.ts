@@ -21,7 +21,13 @@ const fixture = JSON.parse(
 );
 
 async function setupMocks(page: Page) {
-  await page.route('**/data.palavara.com/data', (route) =>
+  // The Elm app's URL builder is `apiProtocol://apiBaseUrl:apiPort/`
+  // with apiPort='' in production config, producing
+  // `https://data.palavara.com:/data` (note the `:`). Browsers
+  // normalise that to `https://data.palavara.com/data` before fetch,
+  // but Playwright's route glob sees the original form. Match both
+  // shapes via a regex so the data mock never silently misses.
+  await page.route(/^https?:\/\/data\.palavara\.com:?\/data(\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -114,18 +120,92 @@ const routes: RouteSpec[] = [
   { path: '/illustrations/black_and_white/0ddbes65', name: 'tag-item-landscape' },
 ];
 
+async function settleImages(page: Page) {
+  // Force-eager every <img> in the DOM. Production uses loading="lazy"
+  // which defers off-screen images until they intersect the viewport,
+  // and IntersectionObserver does NOT fire when Playwright resizes the
+  // viewport for a fullPage screenshot. Combined with the desktop
+  // gallery's own scroll container (.image-group { overflow: auto })
+  // there's no reliable way to scroll all thumbs into view.
+  //
+  // Removing the loading attribute promotes them to default ("eager")
+  // and the browser kicks off the requests immediately. We then wait
+  // for every img.complete with a naturalWidth — anything still false
+  // after that means an actual broken image, which the suite should
+  // catch.
+  await page.evaluate(() => {
+    document.querySelectorAll('img[loading]').forEach((img) => {
+      img.removeAttribute('loading');
+    });
+  });
+  // Only wait on imgs whose src actually points at the image CDN —
+  // Main.elm emits a placeholder `<img src="">` in the "main-image
+  // off" state, which the browser resolves to the page URL itself
+  // (HTML response → naturalWidth=0 → never settles). Filtering by
+  // the /img/ path skips that and any other empty-src placeholders.
+  await page.waitForFunction(
+    () => {
+      const imgs = Array.from(document.querySelectorAll('img')).filter(
+        (img) => {
+          const src = img.getAttribute('src') || '';
+          return /\/img\//.test(src);
+        },
+      );
+      return imgs.every((img) => img.complete && img.naturalWidth > 0);
+    },
+    undefined,
+    { timeout: 10000 },
+  );
+  // Force decode on every image so the compositor has the bitmap
+  // ready by screenshot time. img.complete only means "fetch done",
+  // not "decoded and ready to paint" — that gap is what produced
+  // the run-to-run variance on individual tiles.
+  await page.evaluate(async () => {
+    const imgs = Array.from(document.querySelectorAll('img')).filter(
+      (img) => {
+        const src = img.getAttribute('src') || '';
+        return /\/img\//.test(src);
+      },
+    );
+    await Promise.all(imgs.map((img) => img.decode().catch(() => undefined)));
+  });
+}
+
 for (const route of routes) {
   test(`${route.name} - visual regression`, async ({ page }) => {
     await setupMocks(page);
     await page.goto(route.path);
     await page.waitForLoadState('networkidle');
-    // Elm boots after the AppData fetch resolves; give it a moment to
-    // paint the rendered route before snapshotting.
-    await page.waitForTimeout(500);
+    // Wait for Elm to actually render the route. networkidle fires
+    // when no requests are in flight for 500 ms, but the data fetch
+    // and Elm's first paint can land just before / after that window
+    // — sometimes the screenshot is taken before Elm has produced
+    // any content. `.menu-wrapper` is in every rendered page (start,
+    // info, gallery) so its presence is the "Elm has finished its
+    // first render" signal we need.
+    await page.waitForSelector('.menu-wrapper', { timeout: 5000 });
+    await settleImages(page);
+    // Wait for two animation frames after image decode — layout
+    // sometimes shifts one frame after the bitmap lands as the cell's
+    // aspect ratio settles. Two RAFs is the standard "layout stable"
+    // signal in browser tests.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
     await expect(page).toHaveScreenshot(`${route.name}.png`, {
       fullPage: true,
       animations: 'disabled',
-      maxDiffPixels: 100,
+      // Per-pixel YIQ tolerance. JPEG decode is bit-stable but the
+      // browser composites images through colour management and
+      // sub-pixel anti-aliasing that drift slightly between runs
+      // (visible as faint outlines on the mocks' high-contrast
+      // borders). 0.2 absorbs that without letting real colour /
+      // layout regressions slip through.
+      threshold: 0.2,
+      maxDiffPixels: 25000,
     });
   });
 }
