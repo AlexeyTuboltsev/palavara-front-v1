@@ -50,7 +50,11 @@ async function setupMocks(page: Page) {
   };
   await page.route('**/data.palavara.com/**/img/**', async (route) => {
     const url = route.request().url();
-    const m = url.match(/\/img\/(test-(?:landscape|portrait|square))(?:-\d+)?\.(avif|webp|jpg)(?:\?.*)?$/);
+    // Match any /img/<base>(-<width>)?.<ext> where <base> is one of
+    // our test fixtures. The route handler doesn't care which width
+    // the browser asked for — it serves the source mock — because the
+    // suite tests layout, not bandwidth efficiency.
+    const m = url.match(/\/img\/(test-[a-z-]+?)(?:-\d+)?\.(avif|webp|jpg)(?:\?.*)?$/);
     if (!m) return route.fulfill({ status: 404 });
     const [, base, ext] = m;
     const file = path.join(mockDir, `${base}.${ext}`);
@@ -73,15 +77,22 @@ type RouteSpec = { path: string; name: string };
 const routes: RouteSpec[] = [
   { path: '/', name: 'home' },
   { path: '/info', name: 'info' },
-  { path: '/illustrations', name: 'illustrations' },
-  { path: '/graphics', name: 'graphics' },
-  { path: '/ceramics', name: 'ceramics' },
-  // Item pages — exercise pictureFor across aspect ratios so changes
-  // to the <picture> wrapping CSS (display, sizing, srcset originalWidth
-  // fallback, …) get caught by the suite.
-  { path: '/illustrations/0ddbes65', name: 'item-landscape' },     // 7-1.jpg, 1853×1361 (~1.36)
-  { path: '/illustrations/84s4ewzf', name: 'item-portrait' },      // 7-2.jpg, 1603×1950 (~0.82)
-  { path: '/illustrations/ogjun7iq', name: 'item-small-square' },  // 7-3.jpg, 591×566 — also exercises originalWidth fallback (source < 1280)
+  // Section pages (galleryWithTags) — show 12 items in a grid.
+  { path: '/illustrations', name: 'section-illustrations' },
+  { path: '/graphics', name: 'section-graphics' },
+  { path: '/ceramics', name: 'section-ceramics' },
+  // Tag pages — gallery view filtered to a tag's items.
+  { path: '/illustrations/black_and_white', name: 'tag-black-and-white' },
+  { path: '/ceramics/things', name: 'tag-ceramics-things' },
+  // Item pages — exercise pictureFor across aspect ratios. Pinned
+  // itemIds (see fixtures/appdata.json) so each name maps to a known
+  // source mock.
+  { path: '/illustrations/0ddbes65', name: 'item-landscape' },     // pinned to test-medium-landscape (1200×800)
+  { path: '/illustrations/84s4ewzf', name: 'item-portrait' },      // pinned to test-medium-portrait (800×1200)
+  { path: '/illustrations/ogjun7iq', name: 'item-tiny' },          // pinned to test-tiny-square (240×240) — exercises originalWidth fallback (source < 320)
+  // Item-via-tag — same UX as the bare item route but the URL goes
+  // through a tag, exercising TagImageRoute / TagImage parsers.
+  { path: '/illustrations/black_and_white/0ddbes65', name: 'tag-item-landscape' },
 ];
 
 for (const route of routes) {
