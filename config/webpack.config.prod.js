@@ -121,6 +121,13 @@ module.exports = {
     new HtmlWebpackPlugin({
       inject: true,
       template: paths.appHtml,
+      // `defer` keeps the main bundle off the render-blocking critical
+      // path. The Elm app's first paint is data-driven (waits on the
+      // /data fetch anyway), so deferring script execution until after
+      // the parser has the full HTML costs nothing on TTI but unblocks
+      // FCP — Lighthouse measured ~1.2 s of render-blocking on the
+      // pre-defer build.
+      scriptLoading: 'defer',
       minify: {
         removeComments: true,
         collapseWhitespace: true,

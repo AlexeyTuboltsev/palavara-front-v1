@@ -759,7 +759,7 @@ infoPage data =
                 [ buildMenu menuData
                 , div [ class "info-wrapper" ]
                     [ div [ class "info-image" ]
-                        [ pictureFor infoContentData.urlString infoContentData.lqip infoContentData.widths infoContentData.originalWidth "" ]
+                        [ pictureFor infoContentData.urlString infoContentData.lqip infoContentData.widths infoContentData.originalWidth True "" ]
                     , div [ class "info-text" ]
                         (infoText infoContentData.text)
 
@@ -790,7 +790,7 @@ galleryPage data =
                 (case contentData of
                     GalleryContentData desktopContentData ->
                         [ buildMenu menuData
-                        , buildPictures desktopContentData
+                        , buildPictures True desktopContentData
                         , div [ class "main-image off" ]
                             [ img [ src "" ] []
                             ]
@@ -798,7 +798,7 @@ galleryPage data =
 
                     GalleryImageContentData desktopContentImageData ->
                         [ buildMenu menuData
-                        , buildPictures desktopContentImageData
+                        , buildPictures False desktopContentImageData
                         , buildActiveImage desktopContentImageData.activeItem
                         ]
 
@@ -810,13 +810,19 @@ galleryPage data =
             ]
 
 
-buildPictures : { x | items : List ItemContentData } -> Html Msg
-buildPictures contentData =
+buildPictures : Bool -> { x | items : List ItemContentData } -> Html Msg
+buildPictures firstItemIsLcp contentData =
+    -- `firstItemIsLcp` marks the first thumb as the LCP candidate when
+    -- there's no active image rendered alongside the gallery (i.e.,
+    -- SectionRoute / TagRoute on desktop). When an active image is
+    -- rendered (SectionImageRoute / TagImageRoute), pass False — the
+    -- active image is the LCP and gets fetchpriority=high via
+    -- buildActiveImage.
     node
         "div"
         [ class "image-group" ]
-        (List.map
-            (\itemData ->
+        (List.indexedMap
+            (\i itemData ->
                 buildSectionPicture
                     itemData.urlString
                     itemData.onClickMessage
@@ -825,8 +831,8 @@ buildPictures contentData =
                     itemData.lqip
                     itemData.widths
                     itemData.originalWidth
+                    (firstItemIsLcp && i == 0)
             )
-         <|
             contentData.items
         )
 
@@ -852,7 +858,7 @@ buildActiveImage activeImageData =
     in
     div [ class "main-image on" ]
         [ div prevAttributes [ minus ]
-        , pictureFor activeImageData.urlString activeImageData.lqip activeImageData.widths activeImageData.originalWidth ""
+        , pictureFor activeImageData.urlString activeImageData.lqip activeImageData.widths activeImageData.originalWidth True ""
         , div nextAttributes [ plus ]
         ]
 
@@ -885,6 +891,10 @@ buildMobilePictures contentData =
                         itemData.lqip
                         itemData.widths
                         itemData.originalWidth
+                        -- On mobile the slider snap-centres on the active
+                        -- item — that's the visible-on-load image, hence
+                        -- the LCP candidate.
+                        itemData.isActive
                 )
              <|
                 contentData.items
@@ -892,8 +902,8 @@ buildMobilePictures contentData =
         ]
 
 
-buildSectionPicture : String -> Msg -> Bool -> ItemId -> String -> List Int -> Maybe Int -> ( String, Html Msg )
-buildSectionPicture urlString onClickMessage isActive itemId lqip widths originalWidth =
+buildSectionPicture : String -> Msg -> Bool -> ItemId -> String -> List Int -> Maybe Int -> Bool -> ( String, Html Msg )
+buildSectionPicture urlString onClickMessage isActive itemId lqip widths originalWidth isLcp =
     ( itemId
     , a
         [ id itemId
@@ -906,7 +916,7 @@ buildSectionPicture urlString onClickMessage isActive itemId lqip widths origina
             )
         , onClickPreventDefault onClickMessage
         ]
-        [ pictureFor urlString lqip widths originalWidth ""
+        [ pictureFor urlString lqip widths originalWidth isLcp ""
         ]
     )
 
@@ -1143,8 +1153,28 @@ variantSrcSet urlString ext widths originalWidth =
     String.join ", " entries
 
 
-pictureFor : String -> String -> List Int -> Maybe Int -> String -> Html msg
-pictureFor urlString lqip widths originalWidth altText =
+{-| Loading hints for an `<img>`. Set `isLcp` for the one image per
+route that's the largest contentful paint candidate (the active-image
+slot, or the first thumbnail on a section-only gallery). Lighthouse
+flags both `loading="lazy"` and the missing `fetchpriority="high"` on
+LCP candidates — this swaps to eager + high priority for those, lazy
++ async for everything else.
+-}
+imgLoadingAttrs : Bool -> List (Html.Attribute msg)
+imgLoadingAttrs isLcp =
+    if isLcp then
+        [ attribute "fetchpriority" "high"
+        , attribute "decoding" "async"
+        ]
+
+    else
+        [ attribute "loading" "lazy"
+        , attribute "decoding" "async"
+        ]
+
+
+pictureFor : String -> String -> List Int -> Maybe Int -> Bool -> String -> Html msg
+pictureFor urlString lqip widths originalWidth isLcp altText =
     -- <picture> with AVIF + WebP <source> negotiation, JPEG <img>
     -- fallback. The inner <img> keeps the lqipAttrs background-image
     -- trick so the LQIP shows immediately and the full image fades in
@@ -1159,9 +1189,8 @@ pictureFor urlString lqip widths originalWidth altText =
         img
             (src urlString
                 :: alt altText
-                :: attribute "loading" "lazy"
-                :: attribute "decoding" "async"
                 :: lqipAttrs lqip
+                ++ imgLoadingAttrs isLcp
             )
             []
 
@@ -1185,9 +1214,8 @@ pictureFor urlString lqip widths originalWidth altText =
                     :: attribute "srcset" (variantSrcSet urlString "jpg" widths originalWidth)
                     :: attribute "sizes" variantSizesAttr
                     :: alt altText
-                    :: attribute "loading" "lazy"
-                    :: attribute "decoding" "async"
                     :: lqipAttrs lqip
+                    ++ imgLoadingAttrs isLcp
                 )
                 []
             ]
