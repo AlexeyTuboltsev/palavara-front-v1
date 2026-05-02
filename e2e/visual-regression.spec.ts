@@ -172,7 +172,7 @@ async function settleImages(page: Page) {
 }
 
 for (const route of routes) {
-  test(`${route.name} - visual regression`, async ({ page }) => {
+  test(`${route.name} - visual regression`, async ({ page }, testInfo) => {
     await setupMocks(page);
     await page.goto(route.path);
     await page.waitForLoadState('networkidle');
@@ -195,6 +195,22 @@ for (const route of routes) {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
         ),
     );
+
+    // Save the actual screenshot to a stable location regardless of
+    // whether toHaveScreenshot passes or fails. The CI report renders
+    // expected/actual/diff for every route × viewport combo, so the
+    // reviewer can eyeball even passing routes — not just the failing
+    // ones. By default Playwright only writes -actual.png on failure;
+    // this extra screenshot covers the success case too. Run before
+    // toHaveScreenshot so a thrown assertion doesn't skip the save.
+    const actualDir = path.join('test-results', 'visual-actuals', testInfo.project.name);
+    fs.mkdirSync(actualDir, { recursive: true });
+    await page.screenshot({
+      path: path.join(actualDir, `${route.name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+
     await expect(page).toHaveScreenshot(`${route.name}.png`, {
       fullPage: true,
       animations: 'disabled',
