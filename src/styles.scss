@@ -793,6 +793,16 @@ body {
       width: 100%
     }
 
+    /* The grid cell allotted to .info-image is tall (full height of
+       .info-wrapper), and the generic `picture { align-items: center }`
+       rule would centre the portrait inside it — leaving an awkward
+       vertical gap above and below. Top-align it instead so the image
+       sits flush with the top of its column, next to the first
+       paragraph of the about text. */
+    picture {
+      align-items: flex-start;
+    }
+
     @media screen and (min-width: 1024px) {
       z-index: 1;
       margin-left: 5rem;
