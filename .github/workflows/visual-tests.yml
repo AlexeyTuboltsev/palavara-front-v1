@@ -7,6 +7,12 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# Permissions for the deploy step + PR-comment step. The default
+# GITHUB_TOKEN gets these only when explicitly granted.
+permissions:
+  contents: write       # push to gh-pages
+  pull-requests: write  # update the PR comment
+
 jobs:
   visual-tests:
     runs-on: ubuntu-latest
@@ -27,15 +33,97 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      # continue-on-error so the report is built and published even
+      # when assertions fail. Final status is re-asserted at the end of
+      # the job so failures still mark the run red on the PR.
       - name: Run visual regression tests
+        id: tests
+        continue-on-error: true
         run: HOME=/tmp NODE_OPTIONS=--openssl-legacy-provider npx playwright test
         env:
           CI: 'true'
 
-      - name: Upload Playwright report on failure
-        if: failure()
+      - name: Generate visual report
+        if: always()
+        env:
+          REPORT_LABEL: ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.pull_request.number) || format('branch {0}', github.ref_name) }}
+        run: node e2e/generate-report.js
+
+      - name: Compute deploy target
+        if: always()
+        id: target
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            sha="${{ github.event.pull_request.head.sha }}"
+            short="${sha:0:7}"
+            echo "dir=pr-${{ github.event.pull_request.number }}/${short}" >> "$GITHUB_OUTPUT"
+            echo "label=PR #${{ github.event.pull_request.number }} @ ${short}" >> "$GITHUB_OUTPUT"
+          else
+            sha="${{ github.sha }}"
+            short="${sha:0:7}"
+            echo "dir=master/${short}" >> "$GITHUB_OUTPUT"
+            echo "label=master @ ${short}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload Playwright report (artifact)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+
+      - name: Upload visual report (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-report
+          path: visual-report/
+          retention-days: 14
+
+      # Deploy this run's report to gh-pages under
+      # pr-<N>/<short-sha>/ (or master/<short-sha>/). keep_files: true
+      # preserves earlier runs' subdirectories so a PR keeps its history
+      # and other PRs aren't clobbered.
+      - name: Publish report to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./visual-report
+          destination_dir: ${{ steps.target.outputs.dir }}
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Visual report: ${{ steps.target.outputs.label }}'
+
+      # Sticky single comment per PR. The marker string in `body-includes`
+      # is what create-or-update-comment uses to find an existing comment
+      # to edit; on first run it creates one, on subsequent runs it edits
+      # in place so the PR conversation isn't spammed.
+      - name: Comment on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: '<!-- visual-regression-report -->'
+          edit-mode: replace
+          body: |
+            <!-- visual-regression-report -->
+            ## Visual regression report
+
+            **${{ steps.target.outputs.label }}** · ${{ steps.tests.outcome == 'success' && '✅ all passed' || '❌ failures present' }}
+
+            📷 [Open the report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ steps.target.outputs.dir }}/)
+
+            Each route × viewport row shows expected, actual, and (when present) diff. Updated on every push to this PR.
+
+      # Re-fail the job if the test step failed, so the GitHub status
+      # check on the PR reflects reality. continue-on-error above only
+      # masks the failure long enough to publish the report.
+      - name: Mark job failed if tests failed
+        if: always() && steps.tests.outcome == 'failure'
+        run: |
+          echo "Visual tests reported failures — failing the job."
+          exit 1
