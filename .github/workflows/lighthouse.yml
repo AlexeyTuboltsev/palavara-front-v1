@@ -74,9 +74,11 @@ jobs:
             path="${entry#*:}"
             url="${{ env.SITE_URL }}${path}"
             echo "::group::Lighthouse — ${slug} (${path})"
+            # Lighthouse 13's --preset only accepts perf / experimental
+            # / desktop. Mobile is the default emulation when no preset
+            # is given, so simply omit the flag for mobile runs.
             lighthouse "${url}" \
               --quiet \
-              --preset=mobile \
               --chrome-flags="--headless=new --no-sandbox" \
               --only-categories=performance \
               --output=json --output=html \
