@@ -102,6 +102,18 @@ picture {
   min-height: 0;
 }
 
+/* Without this, an <img width="W" height="H"> emitted for CLS
+   reservation falls back to its HTML height attribute as a CSS
+   presentational hint — the image renders at H pixels tall regardless
+   of CSS width: 100%, breaking layouts whose author CSS only sets
+   width. Resetting height to auto here turns the HTML attrs into a
+   pure aspect-ratio hint (which is what we want); class-based rules
+   that explicitly set `height` (e.g. `.image img { height: 100% }`
+   on desktop gallery items) still win because they're more specific. */
+picture > img {
+  height: auto;
+}
+
 a:visited, a:hover, a:focus {
   text-decoration: none;
 }
