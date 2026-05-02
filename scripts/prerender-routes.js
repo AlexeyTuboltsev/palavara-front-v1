@@ -90,19 +90,75 @@ function capitalize(s) {
  * Fails loudly if any expected pattern doesn't match — silent half-
  * rewritten files are worse than a build error.
  */
+// Set to true after inlineLatinFont() succeeds — used to suppress the
+// now-redundant <link rel="preload" as="font"> for latin (the bytes
+// are already in the CSS data URI, so a preload would just trigger an
+// unused second fetch).
+let LATIN_FONT_INLINED = false;
+
 /**
- * Find the hashed didact-gothic-latin font in build/fonts/ and emit a
- * `<link rel="preload" as="font">` for it. Body text uses this font;
- * Lighthouse's network dependency tree on /illustrations showed it as
- * the longest critical-path leg (~2,800 ms), because the browser only
- * discovers the @font-face URL after CSS parses. Preloading from HTML
- * starts the fetch in parallel with the CSS download and shaves the
- * chain down to roughly the CSS time alone.
+ * Inline the didact-gothic-latin woff2 directly into the built CSS as
+ * a base64 data: URI. Body text uses this font and Lighthouse's
+ * network dependency tree on /illustrations showed it as the longest
+ * critical-path leg (~2,800 ms): the browser only discovers the
+ * @font-face URL after CSS parses, then has to fetch the font as a
+ * separate request. With the bytes embedded in the CSS, the font is
+ * "available" the instant CSS arrives — no separate request, no extra
+ * round trip.
  *
- * Returns "" if the font isn't found (build/fonts may not exist in
- * dev) — the page still renders, just without the preload.
+ * ~17.8 KB woff2 → ~24 KB base64 → ~6-10 KB once brotli is applied to
+ * the CSS at the CDN. CSS is cached `max-age=1y immutable` so this
+ * extra weight is paid once per CSS hash bump, not per page.
+ *
+ * Only the latin font is inlined — cyrillic and latin-ext are only
+ * used when the page renders text in those scripts (rare; the about
+ * page mentions a few names) and inlining them all would add ~25 KB
+ * of base64 weight to every CSS download for marginal LCP benefit.
+ */
+function inlineLatinFont() {
+  let cssEntries;
+  try {
+    cssEntries = fs.readdirSync(buildDir).filter((f) => /^main-.*\.css$/.test(f));
+  } catch {
+    return;
+  }
+  if (!cssEntries.length) {
+    console.warn('inlineLatinFont: no main-*.css found, skipping');
+    return;
+  }
+  const fontUrlRe = /url\((\/fonts\/didact-gothic-latin\.[a-z0-9]+\.woff2)\)/g;
+  for (const cssFile of cssEntries) {
+    const cssPath = path.join(buildDir, cssFile);
+    let css = fs.readFileSync(cssPath, 'utf8');
+    let count = 0;
+    css = css.replace(fontUrlRe, (match, urlPath) => {
+      const fontPath = path.join(buildDir, urlPath.replace(/^\//, ''));
+      try {
+        const buf = fs.readFileSync(fontPath);
+        const b64 = buf.toString('base64');
+        count++;
+        return `url(data:font/woff2;base64,${b64})`;
+      } catch (e) {
+        console.warn(`inlineLatinFont: failed to read ${fontPath}: ${e.message}`);
+        return match;
+      }
+    });
+    if (count > 0) {
+      fs.writeFileSync(cssPath, css);
+      console.log(`✓ inlined didact-gothic-latin into ${cssFile} (${count} occurrence${count > 1 ? 's' : ''})`);
+      LATIN_FONT_INLINED = true;
+    }
+  }
+}
+
+/**
+ * Build a `<link rel="preload" as="font">` for the hashed
+ * didact-gothic-latin file. Returns "" when the font is already
+ * inlined into CSS (preload would just trigger a redundant second
+ * fetch) or when build/fonts/ doesn't exist (dev or test envs).
  */
 function findFontPreload() {
+  if (LATIN_FONT_INLINED) return '';
   const fontsDir = path.join(buildDir, 'fonts');
   let entries;
   try {
@@ -110,10 +166,6 @@ function findFontPreload() {
   } catch {
     return '';
   }
-  // Only the latin file is critical-path on first paint — cyrillic
-  // and latin-ext are loaded only when the page actually renders
-  // text in those scripts (the about page does in places, but it's
-  // never the LCP).
   const file = entries.find((f) => /^didact-gothic-latin\.[a-z0-9]+\.woff2$/.test(f));
   if (!file) return '';
   return `<link rel="preload" as="font" type="font/woff2" href="/fonts/${file}" crossorigin>`;
@@ -424,6 +476,11 @@ async function main() {
   }
   template = template.replace(scriptRe, (m) => m.replace('<script ', '<script defer '));
   fs.writeFileSync(indexPath, template);
+
+  // Inline the latin font into CSS before reading per-route preload
+  // tags — once it succeeds, findFontPreload() returns "" so we don't
+  // emit a redundant <link rel="preload" as="font">.
+  inlineLatinFont();
 
   let appData;
   try {
