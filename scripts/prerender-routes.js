@@ -90,7 +90,88 @@ function capitalize(s) {
  * Fails loudly if any expected pattern doesn't match — silent half-
  * rewritten files are worse than a build error.
  */
-function rewriteHtml(template, { title, description, canonical, ogImage, jsonLd, lcpPreload }) {
+/**
+ * Find the hashed didact-gothic-latin font in build/fonts/ and emit a
+ * `<link rel="preload" as="font">` for it. Body text uses this font;
+ * Lighthouse's network dependency tree on /illustrations showed it as
+ * the longest critical-path leg (~2,800 ms), because the browser only
+ * discovers the @font-face URL after CSS parses. Preloading from HTML
+ * starts the fetch in parallel with the CSS download and shaves the
+ * chain down to roughly the CSS time alone.
+ *
+ * Returns "" if the font isn't found (build/fonts may not exist in
+ * dev) — the page still renders, just without the preload.
+ */
+function findFontPreload() {
+  const fontsDir = path.join(buildDir, 'fonts');
+  let entries;
+  try {
+    entries = fs.readdirSync(fontsDir);
+  } catch {
+    return '';
+  }
+  // Only the latin file is critical-path on first paint — cyrillic
+  // and latin-ext are loaded only when the page actually renders
+  // text in those scripts (the about page does in places, but it's
+  // never the LCP).
+  const file = entries.find((f) => /^didact-gothic-latin\.[a-z0-9]+\.woff2$/.test(f));
+  if (!file) return '';
+  return `<link rel="preload" as="font" type="font/woff2" href="/fonts/${file}" crossorigin>`;
+}
+
+/**
+ * Build a static <picture> for the LCP candidate, mirroring exactly
+ * what Main.elm's pictureFor + buildSectionPicture would emit. Goes
+ * inside <body> so the browser parses it during HTML parse, fetches
+ * the AVIF variant, and paints it BEFORE the Elm bundle finishes
+ * booting — closing the LCP "element render delay" window that
+ * Lighthouse measures at ~1.5 s on /illustrations (Elm
+ * Browser.application boot + first render time on a Moto G).
+ *
+ * Caveat: Elm's Browser.application owns <body>; when it mounts, the
+ * existing body content is replaced by the first render. Whether the
+ * static element survives matters for LCP detachment behaviour. Even
+ * in the worst case (Elm wipes and re-renders) the image is already
+ * fetched + decoded, so Elm's <picture> paints instantly from cache.
+ *
+ * Returns "" for kinds without a clear LCP candidate (info, home).
+ */
+function staticLcpFor(kind, ctx) {
+  const { section, tag, item } = ctx;
+  let lcpItem;
+  if (kind === 'item' || kind === 'tagItem') lcpItem = item;
+  else if (kind === 'section') lcpItem = (section.items || [])[0];
+  else if (kind === 'tag') lcpItem = (tag.items || [])[0];
+  else return '';
+  if (!lcpItem || !lcpItem.fileName || !Array.isArray(lcpItem.widths) || !lcpItem.widths.length) {
+    return '';
+  }
+  const dotIdx = lcpItem.fileName.lastIndexOf('.');
+  const base = dotIdx >= 0 ? lcpItem.fileName.slice(0, dotIdx) : lcpItem.fileName;
+  const prefix = `https://data.palavara.com/img/${base}`;
+  const srcsetFor = (ext) =>
+    lcpItem.widths.map((w) => `${prefix}-${w}.${ext} ${w}w`).join(', ');
+  const sizes = '(max-width: 1024px) 100vw, 50vw';
+  const w = lcpItem.originalWidth;
+  const h = lcpItem.originalHeight;
+  const dims = (w && h) ? ` width="${w}" height="${h}"` : '';
+  const fullJpg = `https://data.palavara.com/img/${lcpItem.fileName}`;
+  return (
+    `<div class="layout">` +
+      `<div class="image-group">` +
+        `<a class="image" id="${escapeAttr(lcpItem.itemId)}">` +
+          `<picture>` +
+            `<source type="image/avif" srcset="${escapeAttr(srcsetFor('avif'))}" sizes="${escapeAttr(sizes)}">` +
+            `<source type="image/webp" srcset="${escapeAttr(srcsetFor('webp'))}" sizes="${escapeAttr(sizes)}">` +
+            `<img src="${escapeAttr(fullJpg)}" srcset="${escapeAttr(srcsetFor('jpg'))}" sizes="${escapeAttr(sizes)}"${dims} fetchpriority="high" decoding="async" alt="">` +
+          `</picture>` +
+        `</a>` +
+      `</div>` +
+    `</div>`
+  );
+}
+
+function rewriteHtml(template, { title, description, canonical, ogImage, jsonLd, lcpPreload, fontPreload, staticLcp }) {
   const titleText = escapeText(title);
   const titleAttr = escapeAttr(title);
   const descAttr = escapeAttr(description);
@@ -129,6 +210,23 @@ function rewriteHtml(template, { title, description, canonical, ogImage, jsonLd,
   // since the parser scans the whole head before fetching).
   if (lcpPreload) {
     html = html.replace('</head>', `${lcpPreload}</head>`);
+  }
+
+  // Font preload — same placement as LCP preload, same reasoning.
+  if (fontPreload) {
+    html = html.replace('</head>', `${fontPreload}</head>`);
+  }
+
+  // Static LCP element — injected into the empty <body> placeholder
+  // so the browser paints the LCP image before Elm even boots. Elm
+  // owns body once it mounts; whatever static markup is here gets
+  // reconciled (or replaced) by Elm's first render. The image bytes
+  // are cached by then so even a hard replace repaints instantly.
+  if (staticLcp) {
+    html = html.replace(
+      /<body>(\s*)<noscript>/,
+      `<body>$1${staticLcp}<noscript>`,
+    );
   }
 
   return html;
@@ -335,13 +433,23 @@ async function main() {
     return;
   }
 
+  // Font preload string is the same on every route — compute once.
+  const fontPreload = findFontPreload();
+
   let count = 0;
   const sitemapUrls = [];
   const generate = (urlPath, kind, ctx) => {
     const meta = metaFor(kind, ctx);
     const ld = jsonLdFor(kind, ctx, meta);
     const lcpPreload = lcpPreloadFor(kind, ctx);
-    const html = rewriteHtml(template, { ...meta, jsonLd: ld, lcpPreload });
+    const staticLcp = staticLcpFor(kind, ctx);
+    const html = rewriteHtml(template, {
+      ...meta,
+      jsonLd: ld,
+      lcpPreload,
+      fontPreload,
+      staticLcp,
+    });
     writeRoute(urlPath, html);
     count++;
   };
