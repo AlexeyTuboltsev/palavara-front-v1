@@ -1,0 +1,153 @@
+name: Lighthouse
+
+# Runs after a successful "Deploy to Production" run finishes
+# uploading to S3 + invalidating CloudFront. We measure the real
+# production deployment (CloudFront + brotli + real RTT, etc.) — a
+# local `npx serve` build is too divorced from prod to gate on.
+on:
+  workflow_run:
+    workflows: ["Deploy to Production"]
+    types: [completed]
+  workflow_dispatch:
+
+# Pin to the exact Lighthouse version PSI runs so the scores in this
+# workflow match what pagespeed.web.dev would report. Bump this
+# whenever PSI bumps (the version is listed at the top of any PSI
+# run alongside "Emulated Moto G Power with Lighthouse X.Y.Z").
+env:
+  LIGHTHOUSE_VERSION: '13.0.1'
+  MIN_PERFORMANCE_SCORE: '93'
+  SITE_URL: 'https://palavara.com'
+
+permissions:
+  contents: write       # publish reports to gh-pages
+  pull-requests: write  # not currently used; reserved for future PR-comment tie-in
+
+jobs:
+  lighthouse:
+    # Skip when the upstream deploy run failed — there's no point
+    # measuring an unsuccessful deploy. workflow_dispatch always runs.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Lighthouse
+        run: npm install -g lighthouse@${{ env.LIGHTHOUSE_VERSION }}
+
+      # CloudFront's deploy step (`aws cloudfront create-invalidation`)
+      # returns immediately — the actual edge propagation takes a few
+      # minutes. Without this wait the run measures the previous deploy
+      # and reports a misleading score. 90 seconds is a safe margin
+      # given typical CF invalidation latency (most edges in 30-60 s).
+      - name: Wait for CloudFront propagation
+        if: github.event_name == 'workflow_run'
+        run: sleep 90
+
+      - name: Run Lighthouse on each route
+        id: lh
+        run: |
+          mkdir -p reports
+          # Routes covered: home, info, section, section-tag,
+          # section-tag-item. Real production palavara.com URLs.
+          ROUTES=(
+            "home:/"
+            "info:/info"
+            "section:/illustrations"
+            "section-tag:/illustrations/black_and_white"
+            "section-tag-item:/illustrations/black_and_white/84s4ewzf"
+          )
+          fail=0
+          {
+            echo "| Route | Path | Score | LCP | TBT | CLS | SI |"
+            echo "|---|---|---|---|---|---|---|"
+          } > reports/summary.md
+          for entry in "${ROUTES[@]}"; do
+            slug="${entry%%:*}"
+            path="${entry#*:}"
+            url="${{ env.SITE_URL }}${path}"
+            echo "::group::Lighthouse — ${slug} (${path})"
+            lighthouse "${url}" \
+              --quiet \
+              --preset=mobile \
+              --chrome-flags="--headless=new --no-sandbox" \
+              --only-categories=performance \
+              --output=json --output=html \
+              --output-path="reports/${slug}" \
+              || true
+            json="reports/${slug}.report.json"
+            if [ ! -f "$json" ]; then
+              echo "::error::Lighthouse produced no JSON for ${slug}"
+              fail=1
+              continue
+            fi
+            score=$(jq -r '(.categories.performance.score // 0) * 100 | floor' "$json")
+            lcp=$(jq -r '.audits["largest-contentful-paint"].displayValue // "—"' "$json")
+            tbt=$(jq -r '.audits["total-blocking-time"].displayValue // "—"' "$json")
+            cls=$(jq -r '.audits["cumulative-layout-shift"].displayValue // "—"' "$json")
+            si=$(jq -r '.audits["speed-index"].displayValue // "—"' "$json")
+            echo "${slug} → ${score}/100 (LCP ${lcp} TBT ${tbt} CLS ${cls} SI ${si})"
+            echo "| **${slug}** | \`${path}\` | ${score} | ${lcp} | ${tbt} | ${cls} | ${si} |" >> reports/summary.md
+            if [ "${score}" -lt "${{ env.MIN_PERFORMANCE_SCORE }}" ]; then
+              echo "::error::${slug} score ${score} < threshold ${{ env.MIN_PERFORMANCE_SCORE }}"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          {
+            echo "## Lighthouse — production"
+            echo ""
+            cat reports/summary.md
+            echo ""
+            echo "_Threshold: ${{ env.MIN_PERFORMANCE_SCORE }} / Lighthouse ${{ env.LIGHTHOUSE_VERSION }} / measured against ${{ env.SITE_URL }}_"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "fail=${fail}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute deploy target dir
+        if: always()
+        id: target
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            sha="${{ github.event.workflow_run.head_sha }}"
+          else
+            sha="${{ github.sha }}"
+          fi
+          short="${sha:0:7}"
+          echo "dir=lighthouse/master/${short}" >> "$GITHUB_OUTPUT"
+          echo "label=master @ ${short}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload reports (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: reports/
+          retention-days: 30
+
+      # Publish HTML reports to gh-pages alongside visual-regression.
+      # Same gh-pages branch, separate `lighthouse/` subtree.
+      - name: Publish reports to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./reports
+          destination_dir: ${{ steps.target.outputs.dir }}
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Lighthouse (prod): ${{ steps.target.outputs.label }}'
+
+      - name: Fail job if any route is below threshold
+        if: always() && steps.lh.outputs.fail != '0'
+        run: |
+          echo "At least one route scored below ${{ env.MIN_PERFORMANCE_SCORE }} on prod — failing."
+          exit 1
