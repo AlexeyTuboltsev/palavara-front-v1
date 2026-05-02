@@ -29,6 +29,7 @@ type alias ItemData =
     , lqip : String
     , widths : List Int
     , originalWidth : Maybe Int
+    , originalHeight : Maybe Int
     }
 
 
@@ -54,6 +55,7 @@ type alias InfoSectionData =
     , lqip : String
     , widths : List Int
     , originalWidth : Maybe Int
+    , originalHeight : Maybe Int
     }
 
 
@@ -78,13 +80,14 @@ appDataDecoder =
 
 itemDataDecoder : JD.Decoder ItemData
 itemDataDecoder =
-    JD.map6 ItemData
+    JD.map7 ItemData
         (JD.field "itemId" JD.string)
         (JD.field "fileName" JD.string)
         (JD.field "urlString" JD.string)
         (JD.oneOf [ JD.field "lqip" JD.string, JD.succeed "" ])
         (JD.oneOf [ JD.field "widths" (JD.list JD.int), JD.succeed [] ])
         (JD.maybe (JD.field "originalWidth" JD.int))
+        (JD.maybe (JD.field "originalHeight" JD.int))
 
 
 tagDataDecoder : JD.Decoder TagData
@@ -120,7 +123,7 @@ sectionDataDecoder =
                             |> JD.map GallerySectionType
 
                     "info" ->
-                        JD.map7 InfoSectionData
+                        JD.map8 InfoSectionData
                             (JD.field "label" JD.string)
                             (JD.field "sectionId" JD.string)
                             (JD.field "text" JD.string)
@@ -128,6 +131,7 @@ sectionDataDecoder =
                             (JD.oneOf [ JD.field "lqip" JD.string, JD.succeed "" ])
                             (JD.oneOf [ JD.field "widths" (JD.list JD.int), JD.succeed [] ])
                             (JD.maybe (JD.field "originalWidth" JD.int))
+                            (JD.maybe (JD.field "originalHeight" JD.int))
                             |> JD.map InfoSectionType
 
                     _ ->
