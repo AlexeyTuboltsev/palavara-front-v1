@@ -173,7 +173,7 @@ async function generateVariantsFor(fileName) {
       made++;
     }
   }
-  return { fileName, made, dimensions: `${meta.width}x${meta.height}`, widths, originalWidth: meta.width || null };
+  return { fileName, made, dimensions: `${meta.width}x${meta.height}`, widths, originalWidth: meta.width || null, originalHeight: meta.height || null };
 }
 
 async function generateLqip(fileName) {
@@ -219,12 +219,14 @@ async function main() {
   let totalMade = 0;
   const widthsByFile = {};
   const originalWidthByFile = {};
+  const originalHeightByFile = {};
   await pLimit(usableFileNames, CONCURRENCY, async (fn, i) => {
     try {
       const r = await generateVariantsFor(fn);
       if (r.made) totalMade += r.made;
       widthsByFile[fn] = r.widths || [];
       if (r.originalWidth) originalWidthByFile[fn] = r.originalWidth;
+      if (r.originalHeight) originalHeightByFile[fn] = r.originalHeight;
       if ((i + 1) % 25 === 0 || i + 1 === usableFileNames.length) {
         process.stdout.write(`  ${i + 1}/${usableFileNames.length}\r`);
       }
@@ -261,6 +263,7 @@ async function main() {
     const lq = lqips[it.fileName];
     const widths = widthsByFile[it.fileName];
     const ow = originalWidthByFile[it.fileName];
+    const oh = originalHeightByFile[it.fileName];
     let changed = false;
     if (lq && it.lqip !== lq) {
       it.lqip = lq;
@@ -272,6 +275,10 @@ async function main() {
     }
     if (ow && it.originalWidth !== ow) {
       it.originalWidth = ow;
+      changed = true;
+    }
+    if (oh && it.originalHeight !== oh) {
+      it.originalHeight = oh;
       changed = true;
     }
     if (changed) updated++;
@@ -286,6 +293,7 @@ async function main() {
     const lq = lqips[s.imageId];
     const widths = widthsByFile[s.imageId];
     const ow = originalWidthByFile[s.imageId];
+    const oh = originalHeightByFile[s.imageId];
     let changed = false;
     if (lq && s.lqip !== lq) {
       s.lqip = lq;
@@ -297,6 +305,10 @@ async function main() {
     }
     if (ow && s.originalWidth !== ow) {
       s.originalWidth = ow;
+      changed = true;
+    }
+    if (oh && s.originalHeight !== oh) {
+      s.originalHeight = oh;
       changed = true;
     }
     if (changed) updated++;

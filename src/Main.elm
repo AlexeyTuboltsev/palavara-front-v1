@@ -306,7 +306,7 @@ generatePageData modelData activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths id.originalWidth
+                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths id.originalWidth id.originalHeight
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MenuInfoData { menuSectionData = sd }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -444,7 +444,7 @@ generateMobilePageData modelData sliderHeight activeRoute =
                             )
                         |> Maybe.map
                             (\id ->
-                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths id.originalWidth
+                                generateInfoContentData id.text modelData.apiUrl id.imageId id.lqip id.widths id.originalWidth id.originalHeight
                                     |> Page.InfoPageData (List.map generateInfoMenuData modelData.data |> (\sd -> MobileTogglingMenuData { menuSectionData = sd, menuOpen = False }))
                                     |> InfoPage
                                     |> Tuple.pair activeRoute
@@ -759,7 +759,7 @@ infoPage data =
                 [ buildMenu menuData
                 , div [ class "info-wrapper" ]
                     [ div [ class "info-image" ]
-                        [ pictureFor infoContentData.urlString infoContentData.lqip infoContentData.widths infoContentData.originalWidth True "" ]
+                        [ pictureFor infoContentData.urlString infoContentData.lqip infoContentData.widths infoContentData.originalWidth infoContentData.originalHeight True "" ]
                     , div [ class "info-text" ]
                         (infoText infoContentData.text)
 
@@ -831,6 +831,7 @@ buildPictures firstItemIsLcp contentData =
                     itemData.lqip
                     itemData.widths
                     itemData.originalWidth
+                    itemData.originalHeight
                     (firstItemIsLcp && i == 0)
             )
             contentData.items
@@ -858,7 +859,7 @@ buildActiveImage activeImageData =
     in
     div [ class "main-image on" ]
         [ div prevAttributes [ minus ]
-        , pictureFor activeImageData.urlString activeImageData.lqip activeImageData.widths activeImageData.originalWidth True ""
+        , pictureFor activeImageData.urlString activeImageData.lqip activeImageData.widths activeImageData.originalWidth activeImageData.originalHeight True ""
         , div nextAttributes [ plus ]
         ]
 
@@ -891,6 +892,7 @@ buildMobilePictures contentData =
                         itemData.lqip
                         itemData.widths
                         itemData.originalWidth
+                        itemData.originalHeight
                         -- On mobile the slider snap-centres on the active
                         -- item — that's the visible-on-load image, hence
                         -- the LCP candidate.
@@ -902,8 +904,8 @@ buildMobilePictures contentData =
         ]
 
 
-buildSectionPicture : String -> Msg -> Bool -> ItemId -> String -> List Int -> Maybe Int -> Bool -> ( String, Html Msg )
-buildSectionPicture urlString onClickMessage isActive itemId lqip widths originalWidth isLcp =
+buildSectionPicture : String -> Msg -> Bool -> ItemId -> String -> List Int -> Maybe Int -> Maybe Int -> Bool -> ( String, Html Msg )
+buildSectionPicture urlString onClickMessage isActive itemId lqip widths originalWidth originalHeight isLcp =
     ( itemId
     , a
         [ id itemId
@@ -916,7 +918,7 @@ buildSectionPicture urlString onClickMessage isActive itemId lqip widths origina
             )
         , onClickPreventDefault onClickMessage
         ]
-        [ pictureFor urlString lqip widths originalWidth isLcp ""
+        [ pictureFor urlString lqip widths originalWidth originalHeight isLcp ""
         ]
     )
 
@@ -1173,8 +1175,8 @@ imgLoadingAttrs isLcp =
         ]
 
 
-pictureFor : String -> String -> List Int -> Maybe Int -> Bool -> String -> Html msg
-pictureFor urlString lqip widths originalWidth isLcp altText =
+pictureFor : String -> String -> List Int -> Maybe Int -> Maybe Int -> Bool -> String -> Html msg
+pictureFor urlString lqip widths originalWidth originalHeight isLcp altText =
     -- <picture> with AVIF + WebP <source> negotiation, JPEG <img>
     -- fallback. The inner <img> keeps the lqipAttrs background-image
     -- trick so the LQIP shows immediately and the full image fades in
@@ -1185,11 +1187,17 @@ pictureFor urlString lqip widths originalWidth isLcp altText =
     -- actually produced; an item with widths == [] hasn't been
     -- processed yet, so we serve the original to avoid 500s on
     -- non-existent variant URLs.
+    --
+    -- Width and height attributes (when known from the manifest) let
+    -- the browser reserve a slot of the right aspect ratio before the
+    -- image bytes arrive — eliminates the CLS shift Lighthouse flags
+    -- as "Image elements do not have explicit width and height".
     if List.isEmpty widths then
         img
             (src urlString
                 :: alt altText
-                :: lqipAttrs lqip
+                :: dimensionAttrs originalWidth originalHeight
+                ++ lqipAttrs lqip
                 ++ imgLoadingAttrs isLcp
             )
             []
@@ -1214,11 +1222,29 @@ pictureFor urlString lqip widths originalWidth isLcp altText =
                     :: attribute "srcset" (variantSrcSet urlString "jpg" widths originalWidth)
                     :: attribute "sizes" variantSizesAttr
                     :: alt altText
-                    :: lqipAttrs lqip
+                    :: dimensionAttrs originalWidth originalHeight
+                    ++ lqipAttrs lqip
                     ++ imgLoadingAttrs isLcp
                 )
                 []
             ]
+
+
+{-| Width / height attributes for the `<img>` tag. Both must be present
+for the browser to use them as an aspect-ratio hint (a single attribute
+is ignored). Returns an empty list when either is unknown — better no
+attribute than a misleading one.
+-}
+dimensionAttrs : Maybe Int -> Maybe Int -> List (Html.Attribute msg)
+dimensionAttrs originalWidth originalHeight =
+    case ( originalWidth, originalHeight ) of
+        ( Just w, Just h ) ->
+            [ attribute "width" (String.fromInt w)
+            , attribute "height" (String.fromInt h)
+            ]
+
+        _ ->
+            []
 
 
 relativePos : Pointer.Event -> ( Float, Float )
