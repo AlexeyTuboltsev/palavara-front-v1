@@ -33,24 +33,11 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      # continue-on-error so the report is built and published even
-      # when assertions fail. Final status is re-asserted at the end of
-      # the job so failures still mark the run red on the PR.
-      - name: Run visual regression tests
-        id: tests
-        continue-on-error: true
-        run: HOME=/tmp NODE_OPTIONS=--openssl-legacy-provider npx playwright test
-        env:
-          CI: 'true'
-
-      - name: Generate visual report
-        if: always()
-        env:
-          REPORT_LABEL: ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.pull_request.number) || format('branch {0}', github.ref_name) }}
-        run: node e2e/generate-report.js
-
+      # Compute target dir + label up front so later steps (report
+      # generator, gh-pages publish, PR comment) can all reference one
+      # set of outputs instead of duplicating the GitHub-context
+      # expression and risking YAML quoting headaches.
       - name: Compute deploy target
-        if: always()
         id: target
         shell: bash
         run: |
@@ -65,6 +52,22 @@ jobs:
             echo "dir=master/${short}" >> "$GITHUB_OUTPUT"
             echo "label=master @ ${short}" >> "$GITHUB_OUTPUT"
           fi
+
+      # continue-on-error so the report is built and published even
+      # when assertions fail. Final status is re-asserted at the end of
+      # the job so failures still mark the run red on the PR.
+      - name: Run visual regression tests
+        id: tests
+        continue-on-error: true
+        run: HOME=/tmp NODE_OPTIONS=--openssl-legacy-provider npx playwright test
+        env:
+          CI: 'true'
+
+      - name: Generate visual report
+        if: always()
+        env:
+          REPORT_LABEL: ${{ steps.target.outputs.label }}
+        run: node e2e/generate-report.js
 
       - name: Upload Playwright report (artifact)
         if: always()
