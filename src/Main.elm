@@ -8,7 +8,7 @@ import Browser.Navigation as Navigation exposing (Key, load)
 import Constants exposing (mobileBreakpoint)
 import Html exposing (Html, a, br, div, img, source, span, text)
 import Html.Attributes exposing (alt, attribute, class, href, id, property, rel, src, style, target)
-import Html.Events.Extra exposing (onClickPreventDefault, onClickPreventDefaultAndStopPropagation)
+import Html.Events.Extra exposing (onClickPreventDefault, onClickPreventDefaultAndStopPropagation, onClickStopPropagation)
 import Html.Events.Extra.Pointer as Pointer
 import Html.Keyed exposing (node)
 import Html.Parser.Util
@@ -1035,12 +1035,21 @@ buildInfoEntry sectionData =
 
 buildMobileInfoEntry : MenuSectionData -> Html Msg
 buildMobileInfoEntry sectionData =
+    -- The mobile menu in MobileTogglingMenuData attaches
+    -- `onClickPreventDefault OpenMenu` to the entire `.menu.closed`
+    -- container (Main.elm "False" branch around line 971). Without
+    -- stopPropagation here, tapping "shop" or "studio" on /info
+    -- bubbles up to that handler — which preventDefaults the link
+    -- navigation and just opens the menu instead. Stopping
+    -- propagation lets the browser's default target="_blank"
+    -- behaviour run normally; we don't preventDefault, so the
+    -- new-tab navigation happens.
     div [ class "menu-entry info" ]
         [ a [ class "menu-entry-label", onClickPreventDefault sectionData.onClickMessage, href sectionData.urlString ] [ text sectionData.sectionLabel ]
         , span [ class "info-pipe" ] [ text "|" ]
-        , a [ class "menu-entry-label", href etsyLink, target "_blank", rel "noopener noreferrer" ] [ text "shop" ]
+        , a [ class "menu-entry-label", onClickStopPropagation NoOp, href etsyLink, target "_blank", rel "noopener noreferrer" ] [ text "shop" ]
         , span [ class "info-pipe" ] [ text "|" ]
-        , a [ class "menu-entry-label", href studioLink, target "_blank", rel "noopener noreferrer" ] [ text "studio" ]
+        , a [ class "menu-entry-label", onClickStopPropagation NoOp, href studioLink, target "_blank", rel "noopener noreferrer" ] [ text "studio" ]
         ]
 
 buildGalleryWithTagsEntry : MenuSectionData -> Html Msg
