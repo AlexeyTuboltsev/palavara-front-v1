@@ -1,7 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script defer src="https://cloud.umami.is/script.js" data-website-id="9a3edee6-4da2-4b7f-bad8-395f5dc4d1a1" data-domains="palavara.com"></script>
+<!-- Analytics (Umami) — injected 4 s after window.load so its DNS +
+     TLS handshake to cloud.umami.is doesn't compete with the hero
+     image paint. <script defer> on its own is NOT enough — defer
+     fires during parsing, well before LCP commits.
+     PRESERVE THIS PATTERN when swapping the analytics provider. -->
+<script>
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://cloud.umami.is/script.js';
+      s.setAttribute('data-website-id', '9a3edee6-4da2-4b7f-bad8-395f5dc4d1a1');
+      s.setAttribute('data-domains', 'palavara.com');
+      document.head.appendChild(s);
+    }, 4000);
+  });
+</script>
 
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
