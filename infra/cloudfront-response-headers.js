@@ -16,7 +16,10 @@
 //
 // Keep the CSP / HSTS values in sync with whatever inline scripts and
 // CDN origins the site actually uses. The script-src hash currently
-// matches the GA bootstrap inline <script> in public/index.html.
+// matches the Umami 4 s-defer inline scheduler in public/index.html
+// (post-minification — webpack/terser output, not source). Any byte-
+// level change to that scheduler (whitespace included) breaks the
+// hash and silently kills analytics until the hash is re-computed.
 
 function handler(event) {
     var response = event.response;
@@ -36,11 +39,11 @@ function handler(event) {
     headers['content-security-policy'] = {
         value: [
             "default-src 'self' *.palavara.com",
-            "img-src 'self' *.palavara.com data: https://www.google-analytics.com",
-            "script-src 'self' *.palavara.com 'sha256-77XoCGsFb5hDuCajDwYR/6Otip4fiyKsLsKRActYJO0=' https://www.googletagmanager.com https://www.google-analytics.com",
+            "img-src 'self' *.palavara.com data:",
+            "script-src 'self' *.palavara.com 'sha256-t3d3j8vuFoG7kAjg5YA+6d+9CrIGJI3l7foVvN7XhW8=' https://cloud.umami.is",
             "style-src 'self' *.palavara.com",
             "font-src 'self' *.palavara.com data:",
-            "connect-src 'self' *.palavara.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+            "connect-src 'self' *.palavara.com https://cloud.umami.is",
         ].join('; '),
     };
 
