@@ -65,4 +65,42 @@ find build -type f -name "*.html" ! -name "index.html" -print0 | \
   '
 echo "uploaded prerendered routes"
 
+# 4. CloudFront Function (security headers + CSP). Sync the LIVE
+#    function with infra/cloudfront-response-headers.js if it has
+#    drifted. Without this, edits to the function source sit in the
+#    repo with nothing pushing them to AWS — that's how the GA → Umami
+#    CSP miss (May 2026) went undetected for ~4 weeks until analytics
+#    on palavara.com broke. Skipped when live code matches the repo
+#    file so unrelated deploys don't churn the function.
+functionName="palavara-front-response-headers"
+functionFile="infra/cloudfront-response-headers.js"
+
+tmpLive=$(mktemp)
+trap 'rm -f "$tmpLive"' EXIT
+# get-function's last positional arg is the output file path; the CLI
+# writes the function source code there.
+aws cloudfront get-function \
+  --name "$functionName" \
+  --stage LIVE \
+  "$tmpLive" >/dev/null
+
+if cmp -s "$tmpLive" "$functionFile"; then
+  echo "CloudFront Function $functionName is up to date — skipping"
+else
+  echo "CloudFront Function $functionName drift detected — updating"
+  etag=$(aws cloudfront describe-function \
+    --name "$functionName" --stage LIVE \
+    --query 'ETag' --output text)
+  newEtag=$(aws cloudfront update-function \
+    --name "$functionName" \
+    --function-config Comment='Security headers + CSP',Runtime=cloudfront-js-2.0 \
+    --function-code "fileb://$functionFile" \
+    --if-match "$etag" \
+    --query 'ETag' --output text)
+  aws cloudfront publish-function \
+    --name "$functionName" \
+    --if-match "$newEtag" >/dev/null
+  echo "Published $functionName to LIVE"
+fi
+
 aws cloudfront create-invalidation --distribution-id "$distributionId" --paths "/*"
