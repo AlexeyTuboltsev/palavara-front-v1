@@ -40,7 +40,7 @@ function handler(event) {
         value: [
             "default-src 'self' *.palavara.com",
             "img-src 'self' *.palavara.com data:",
-            "script-src 'self' *.palavara.com 'sha256-e7rVVLQevgjTeCLAUEdnnAdpKIRep7sgiH2o5gNvHfg=' https://cloud.umami.is",
+            "script-src 'self' *.palavara.com 'sha256-t3d3j8vuFoG7kAjg5YA+6d+9CrIGJI3l7foVvN7XhW8=' https://cloud.umami.is",
             "style-src 'self' *.palavara.com",
             "font-src 'self' *.palavara.com data:",
             "connect-src 'self' *.palavara.com https://cloud.umami.is",
